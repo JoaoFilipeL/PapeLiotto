@@ -7,7 +7,7 @@ import { Trash2, Plus } from "lucide-react"
 import DialogUpdateItem from "./dialogUpdateItem"
 
 interface StockCardProps {
-    id: string
+    id: number
     name: string
     code: number
     category: string
@@ -93,6 +93,7 @@ export default function StockCard({
                     lastUpdated={lastUpdated}
                 />
             )}
+
         </>
     )
 }

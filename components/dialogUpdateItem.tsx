@@ -15,7 +15,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectLabel, SelectVa
 interface DialogUpdateItemProps {
     isOpen: boolean
     setIsOpen: (isOpen: boolean) => void
-    id: string
+    id: number
     name: string
     code: number
     category: string
@@ -43,6 +43,7 @@ export default function DialogUpdateItem({
 }: DialogUpdateItemProps) {
 
     const [item, setItem] = useState<Item>({
+        id,
         name,
         code,
         category,
@@ -54,8 +55,8 @@ export default function DialogUpdateItem({
     })
 
     useEffect(() => {
-        setItem({ name, code, category, price, costprice, description, quantity, minStock })
-    }, [isOpen])
+        setItem({ id, name, code, category, price, costprice, description, quantity, minStock })
+      }, [isOpen])      
 
     function handleUpdateItem() {
         UpdateItem(item)
@@ -63,9 +64,10 @@ export default function DialogUpdateItem({
     }
 
     function handleDeleteItem() {
-        DeleteItem({ name, code, category, price, costprice, description, quantity, minStock })
+        DeleteItem(item.id)
         setIsOpen(false)
-    }
+      }
+      
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>

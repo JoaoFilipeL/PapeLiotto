@@ -27,7 +27,7 @@ interface DialogAddItemProps {
 
 export default function DialogAddItem({ isOpen, setIsOpen }: DialogAddItemProps) {
 
-  const [item, setItem] = useState<Item>({
+  const [item, setItem] = useState<Omit<Item, "id">>({
     name: '',
     code: 0,
     category: '',
@@ -37,7 +37,6 @@ export default function DialogAddItem({ isOpen, setIsOpen }: DialogAddItemProps)
     quantity: 0,
     minStock: 0
   })
-
 
   useEffect(() => {
     if (isOpen) {

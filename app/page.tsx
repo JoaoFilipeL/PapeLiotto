@@ -38,7 +38,7 @@ export default function Home() {
           return (
             <StockCard
               key={index}
-              id={index.toString()}
+              id={item.id}
               name={item.name}
               code={item.code}
               category={item.category}
