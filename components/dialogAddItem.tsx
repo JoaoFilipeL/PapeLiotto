@@ -160,7 +160,7 @@ export default function DialogAddItem({ isOpen, setIsOpen }: DialogAddItemProps)
           </div>
         </div>
 
-        <Button onClick={handleCreateItem} className="bg-black hover:bg-gray-800 transition-all duration-300">
+        <Button variant={'secondary'} onClick={handleCreateItem} className="bg-black hover:bg-gray-800 transition-all duration-300">
           <Plus /> Adicionar Produto
         </Button>
 

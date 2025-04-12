@@ -14,7 +14,7 @@ export default function Header() {
                 <h1 className="font-bold text-4xl">Produtos</h1>
             </div>
             <DialogAddItem isOpen={isOpen} setIsOpen={setIsOpen}/>
-            <Button onClick={() => setIsOpen(true)} className="bg-black hover:bg-gray-800 transition-all duration-300"><Package/>Adicionar Produto</Button>
+            <Button variant={'secondary'} onClick={() => setIsOpen(true)} className="bg-black hover:bg-gray-800 transition-all duration-300"><Package/>Adicionar Produto</Button>
         </div>
     )
 };

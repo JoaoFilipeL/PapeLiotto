@@ -167,10 +167,10 @@ export default function DialogUpdateItem({
                 </div>
 
                 <div className="flex justify-center gap-4 mt-4">
-                    <Button onClick={handleDeleteItem} className="w-1/3 bg-red-600 hover:bg-red-500 text-white">
+                    <Button variant={'secondary'} onClick={handleDeleteItem} className="w-1/3 bg-red-600 hover:bg-red-500 text-white">
                         <Trash2 className="w-4 h-4" /> Excluir Produto
                     </Button>
-                    <Button onClick={handleUpdateItem} className="w-1/3 bg-black hover:bg-gray-800 text-white">
+                    <Button variant={'secondary'} onClick={handleUpdateItem} className="w-1/3 bg-black hover:bg-gray-800 text-white">
                         <Plus /> Atualizar Produto
                     </Button>
                 </div>

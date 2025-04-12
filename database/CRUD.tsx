@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabaseClient"
+
 export interface Item {
   id: number
   name: string
@@ -15,6 +17,11 @@ const dispatchStorageEvent = () => {
 };
 
 export async function CreateItem(item: Omit<Item, "id">) {
+
+  const {error} = await supabase.from('Produtos').insert([item])
+
+  if (error) return;
+
   const itens = await localStorage.getItem("list");
   const itensArray: Item[] = itens ? JSON.parse(itens) : [];
 
@@ -23,14 +30,21 @@ export async function CreateItem(item: Omit<Item, "id">) {
 
   localStorage.setItem("list", JSON.stringify([...itensArray, newItem]));
   dispatchStorageEvent();
+
+
 }
 
 export async function ReadItem(): Promise<Item[]> {
-  const itens = await localStorage.getItem("list");
-  return itens ? JSON.parse(itens) : [];
+  const {data} = await supabase.from('Produtos').select('*')
+  return data ? data : [];
 }
 
 export async function UpdateItem(item: Item) {
+
+  const {error} = await supabase.from('Produtos').update(item).eq('id', item.id)
+
+  if (error) return;
+
   const itens = await localStorage.getItem("list");
   const itensArray: Item[] = itens ? JSON.parse(itens) : [];
 
@@ -41,6 +55,11 @@ export async function UpdateItem(item: Item) {
 } 
 
 export async function DeleteItem(id: number) {
+
+  const {error} = await supabase.from('Produtos').delete().eq('id', id)
+
+  if (error) return;
+
   const itens = await localStorage.getItem("list");
   const itensArray: Item[] = itens ? JSON.parse(itens) : [];
 
