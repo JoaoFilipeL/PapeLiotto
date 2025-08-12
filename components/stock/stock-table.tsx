@@ -15,11 +15,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-// Removido: import { Textarea } from "../ui/textarea" // Textarea não será mais usada se não houver descrição de combo
 
-// Interface StockItem (mantida, pois é o foco principal)
 interface StockItem {
     id: string
     name: string
@@ -30,10 +27,7 @@ interface StockItem {
     minQuantity: number
     status: "ok" | "baixo" | "crítico"
     price: number
-    category: string
 }
-
-// Removidas interfaces ComboItem e ProductCombo
 
 const statusColors: Record<string, string> = {
     ok: "bg-green-600 text-white hover:bg-green-700",
@@ -43,27 +37,18 @@ const statusColors: Record<string, string> = {
 
 export function StockTable() {
     const [stock, setStock] = useState<StockItem[]>([])
-    // Removido: const [combos, setCombos] = useState<ProductCombo[]>([]);
     const [searchTerm, setSearchTerm] = useState("")
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-    // Removido: const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
-    // Removido: const [selectedItem, setSelectedItem] = useState<StockItem | null>(null)
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Estados para o novo produto
     const [newItemName, setNewItemName] = useState("")
     const [newItemBarcode, setNewItemBarcode] = useState("")
     const [newItemSupplier, setNewItemSupplier] = useState("")
     const [newItemQuantity, setNewItemQuantity] = useState("")
     const [newItemUnit, setNewItemUnit] = useState("un")
     const [newItemMinQuantity, setNewItemMinQuantity] = useState("")
-    const [newItemPrice, setNewItemPrice] = useState("")
-    const [newItemCategory, setNewItemCategory] = useState("outros");
-
-    // Removidos estados relacionados a combos
-    // Removidos estados relacionados a edição de combos
-    // Removidos estados relacionados a adição de produtos em combos
+    const [newItemPrice, setNewItemPrice] = useState("");
 
     const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<StockItem | null>(null);
@@ -74,7 +59,6 @@ export function StockTable() {
     const [editProductUnit, setEditProductUnit] = useState("un");
     const [editProductMinQuantity, setEditProductMinQuantity] = useState("");
     const [editProductPrice, setEditProductPrice] = useState("");
-    const [editProductCategory, setEditProductCategory] = useState("outros");
     const [editProductFormError, setEditProductFormError] = useState<string | null>(null);
 
 
@@ -89,7 +73,7 @@ export function StockTable() {
         return "ok";
     }, []);
 
-    const fetchStock = useCallback(async () => { // Renomeado de fetchStockAndCombos para fetchStock
+    const fetchStock = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
@@ -114,18 +98,15 @@ export function StockTable() {
                 minQuantity: item.min_quantity,
                 status: calculateStatus(item.quantity, item.min_quantity),
                 price: parseFloat(item.price),
-                category: item.category || 'outros',
             }));
             setStock(fetchedStock);
 
-            // Removido: Lógica de fetch de combos
-
         } catch (err: unknown) {
-            console.error("Erro inesperado ao buscar estoque:", err); // Mensagem ajustada
+            console.error("Erro inesperado ao buscar estoque:", err);
             if (err instanceof Error) {
-                setError(err.message || "Erro ao carregar estoque."); // Mensagem ajustada
+                setError(err.message || "Erro ao carregar estoque.");
             } else {
-                setError("Ocorreu um erro desconhecido ao carregar estoque."); // Mensagem ajustada
+                setError("Ocorreu um erro desconhecido ao carregar estoque.");
             }
         } finally {
             setLoading(false);
@@ -133,9 +114,8 @@ export function StockTable() {
     }, [supabase, calculateStatus]);
 
     useEffect(() => {
-        fetchStock(); // Chamada ajustada
+        fetchStock();
 
-        // Subscrição Realtime para 'stock'
         const stockChannel = supabase
             .channel('stock_changes')
             .on(
@@ -148,20 +128,10 @@ export function StockTable() {
             )
             .subscribe();
 
-        // Removida: Subscrição Realtime para 'product_combos_changes'
-
         return () => {
             supabase.removeChannel(stockChannel);
-            // Removido: supabase.removeChannel(combosChannel);
         };
     }, [supabase, fetchStock]);
-
-    const categoryOrder: Record<string, number> = {
-        "salgado": 1,
-        "doce": 2,
-        "bolo": 3,
-        "outros": 4,
-    };
 
     const sortedAndFilteredStock = stock
         .filter((item) =>
@@ -169,23 +139,14 @@ export function StockTable() {
             item.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
             item.supplier.toLowerCase().includes(searchTerm.toLowerCase())
         )
-        .sort((a, b) => {
-            const categoryA = categoryOrder[a.category.toLowerCase()] || 99;
-            const categoryB = categoryOrder[b.category.toLowerCase()] || 99;
-            if (categoryA !== categoryB) {
-                return categoryA - categoryB;
-            }
-            return a.name.localeCompare(b.name);
-        });
-
-    // Removido: filteredCombos
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     const addNewItem = async () => {
         const quantity = Number.parseFloat(newItemQuantity);
         const minQuantity = Number.parseFloat(newItemMinQuantity);
         const price = Number.parseFloat(newItemPrice);
 
-        if (!newItemName || !newItemBarcode || !newItemSupplier || isNaN(quantity) || isNaN(minQuantity) || isNaN(price) || quantity < 0 || minQuantity < 0 || price < 0 || !newItemCategory) {
+        if (!newItemName || !newItemBarcode || !newItemSupplier || isNaN(quantity) || isNaN(minQuantity) || isNaN(price) || quantity < 0 || minQuantity < 0 || price < 0) {
             setError("Por favor, preencha todos os campos corretamente e com valores válidos.");
             return;
         }
@@ -202,7 +163,6 @@ export function StockTable() {
                         unit: newItemUnit,
                         min_quantity: minQuantity,
                         price: price,
-                        category: newItemCategory,
                     },
                 ]);
 
@@ -219,7 +179,6 @@ export function StockTable() {
             setNewItemUnit("un");
             setNewItemMinQuantity("");
             setNewItemPrice("");
-            setNewItemCategory("outros");
             setIsAddDialogOpen(false);
             setError(null);
         } catch (err: unknown) {
@@ -232,7 +191,6 @@ export function StockTable() {
         }
     };
 
-    // Funções para aumentar/diminuir a quantidade diretamente na tabela (mantidas)
     const updateQuantityInTable = async (itemId: string, currentQuantity: number, change: number) => {
         const newQuantity = currentQuantity + change;
         if (newQuantity < 0) return;
@@ -261,8 +219,7 @@ export function StockTable() {
 
 
     const handleDeleteProduct = async (productId: string) => {
-        // Substituir 'confirm' por um modal customizado no futuro
-        if (!window.confirm("Tem certeza que deseja excluir este produto do estoque?")) { // Mensagem ajustada
+        if (!window.confirm("Tem certeza que deseja excluir este produto do estoque?")) {
             return;
         }
         setLoading(true);
@@ -275,10 +232,10 @@ export function StockTable() {
 
             if (error) {
                 console.error("Erro ao excluir produto:", error);
-                // Remover verificação de '23503' se não houver mais FKs complexas
                 setError(error.message);
             } else {
                 setError(null);
+                setIsEditProductDialogOpen(false);
             }
         } catch (err: unknown) {
             console.error("Erro inesperado ao excluir produto:", err);
@@ -292,10 +249,6 @@ export function StockTable() {
         }
     };
 
-    // Removido: handleDeleteCombo
-
-    // Removido: openUpdateDialog (não é mais necessário com os botões de seta)
-
     const openEditProductDialog = (product: StockItem) => {
         setEditingProduct(product);
         setEditProductName(product.name);
@@ -305,7 +258,6 @@ export function StockTable() {
         setEditProductUnit(product.unit);
         setEditProductMinQuantity(product.minQuantity.toString());
         setEditProductPrice(product.price.toFixed(2));
-        setEditProductCategory(product.category);
         setEditProductFormError(null);
         setIsEditProductDialogOpen(true);
     };
@@ -317,7 +269,7 @@ export function StockTable() {
         const minQuantity = Number.parseFloat(editProductMinQuantity);
         const price = Number.parseFloat(editProductPrice);
 
-        if (!editProductName || !editProductBarcode || !editProductSupplier || isNaN(quantity) || isNaN(minQuantity) || isNaN(price) || quantity < 0 || minQuantity < 0 || price < 0 || !editProductCategory) {
+        if (!editProductName || !editProductBarcode || !editProductSupplier || isNaN(quantity) || isNaN(minQuantity) || isNaN(price) || quantity < 0 || minQuantity < 0 || price < 0) {
             setEditProductFormError("Por favor, preencha todos os campos corretamente e com valores válidos.");
             return;
         }
@@ -333,7 +285,6 @@ export function StockTable() {
                     unit: editProductUnit,
                     min_quantity: minQuantity,
                     price: price,
-                    category: editProductCategory,
                 })
                 .eq('id', editingProduct.id);
 
@@ -356,8 +307,6 @@ export function StockTable() {
         }
     };
 
-    // Removidas funções relacionadas a combo: addProductToCombo, removeProductFromCombo, addNewCombo, openComboDetailsDialog
-
     return (
         <div className="space-y-6 p-2 md:p-4 lg:p-6 bg-zinc-900 rounded-xl">
             {loading && <div className="text-center text-white py-8 flex flex-col items-center justify-center">
@@ -379,7 +328,6 @@ export function StockTable() {
                         />
                     </div>
                 </div>
-                {/* Botão Adicionar Produto */}
                 <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                     <DialogTrigger asChild>
                         <Button className="w-full md:w-auto bg-white text-black hover:bg-gray-200 rounded-md shadow-lg">
@@ -408,8 +356,9 @@ export function StockTable() {
                                 <Input
                                     id="barcode"
                                     value={newItemBarcode}
-                                    onChange={(e) => setNewItemBarcode(e.target.value)}
+                                    onChange={(e) => setNewItemBarcode(e.target.value.replace(/\D/g, '').substring(0, 13))}
                                     placeholder="Ex: 8348122837876"
+                                    type="text"
                                     className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
                                 />
                             </div>
@@ -472,20 +421,6 @@ export function StockTable() {
                                     />
                                 </div>
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="category" className="text-white">Categoria</Label>
-                                <Select value={newItemCategory} onValueChange={setNewItemCategory}>
-                                    <SelectTrigger id="category" className="bg-zinc-800 text-white border-zinc-700">
-                                        <SelectValue placeholder="Selecione uma categoria" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-zinc-800 text-white border-zinc-700">
-                                        <SelectItem value="salgado">Salgado</SelectItem>
-                                        <SelectItem value="doce">Doce</SelectItem>
-                                        <SelectItem value="bolo">Bolo</SelectItem>
-                                        <SelectItem value="outros">Outros</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
                         </div>
                         <DialogFooter className="mt-4">
                             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="border-zinc-700 text-white hover:bg-zinc-800">
@@ -530,11 +465,19 @@ export function StockTable() {
                             </TableRow>
                         ) : (
                             sortedAndFilteredStock.map((item) => (
-                                <TableRow key={item.id} className="border-b border-zinc-700 hover:bg-zinc-700 transition-colors">
-                                    <TableCell className="font-medium text-white">{item.name}</TableCell>
+                                <TableRow
+                                    key={item.id}
+                                    className="border-b border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer"
+                                    onClick={() => openEditProductDialog(item)}
+                                >
+                                    <TableCell className="font-medium text-white">
+                                        {item.name}
+                                    </TableCell>
                                     <TableCell className="text-zinc-300">{item.barcode}</TableCell>
                                     <TableCell className="text-zinc-300">{item.supplier}</TableCell>
-                                    <TableCell className="text-zinc-300">R$ {item.price.toFixed(2)}</TableCell>
+                                    <TableCell className="text-zinc-300">
+                                        {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </TableCell>
                                     <TableCell className="text-zinc-300">
                                         {item.quantity} {item.unit}
                                     </TableCell>
@@ -544,40 +487,21 @@ export function StockTable() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right flex items-center justify-end gap-2">
-                                        {/* Botões de Aumentar/Diminuir Quantidade */}
                                         <Button
                                             variant="ghost"
-                                            size="icon"
-                                            onClick={() => updateQuantityInTable(item.id, item.quantity, -1)}
-                                            className="text-red-500 hover:bg-zinc-700 hover:text-red-400 border border-red-500 rounded-md"
+                                            size="lg"
+                                            onClick={(e) => { e.stopPropagation(); updateQuantityInTable(item.id, item.quantity, -1); }}
+                                            className="text-red-500 hover:bg-zinc-700 hover:text-red-400 border border-red-500 rounded-md h-10 w-10"
                                         >
-                                            <ChevronDown className="h-4 w-4" />
+                                            <ChevronDown className="h-5 w-5" />
                                         </Button>
                                         <Button
                                             variant="ghost"
-                                            size="icon"
-                                            onClick={() => updateQuantityInTable(item.id, item.quantity, 1)}
-                                            className="text-green-500 hover:bg-zinc-700 hover:text-green-400 border border-green-500 rounded-md"
+                                            size="lg"
+                                            onClick={(e) => { e.stopPropagation(); updateQuantityInTable(item.id, item.quantity, 1); }}
+                                            className="text-green-500 hover:bg-zinc-700 hover:text-green-400 border border-green-500 rounded-md h-10 w-10"
                                         >
-                                            <ChevronUp className="h-4 w-4" />
-                                        </Button>
-                                        {/* Botão de Editar Produto */}
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => openEditProductDialog(item)}
-                                            className="text-white hover:bg-zinc-700 border border-zinc-600 rounded-md"
-                                        >
-                                            <Edit className="h-4 w-4" />
-                                        </Button>
-                                        {/* Botão de Excluir Produto */}
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => handleDeleteProduct(item.id)}
-                                            className="text-red-500 hover:text-red-600 hover:bg-zinc-700 border border-red-500 rounded-md"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
+                                            <ChevronUp className="h-5 w-5" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -592,12 +516,6 @@ export function StockTable() {
                 )}
             </div>
 
-            {/* Removida: Seção de Combos */}
-
-            {/* Removida: Modal de Detalhes do Combo */}
-            {/* Removida: Modal de Atualização de Quantidade (já que os botões de seta fazem isso) */}
-
-            {/* Modal de Edição de Produto (mantida e ajustada) */}
             <Dialog open={isEditProductDialogOpen} onOpenChange={setIsEditProductDialogOpen}>
                 <DialogContent className="max-w-md w-[90%] bg-zinc-900 text-white border-zinc-700">
                     <DialogHeader>
@@ -625,8 +543,9 @@ export function StockTable() {
                             <Input
                                 id="editProductBarcode"
                                 value={editProductBarcode}
-                                onChange={(e) => setEditProductBarcode(e.target.value)}
+                                onChange={(e) => setEditProductBarcode(e.target.value.replace(/\D/g, '').substring(0, 13))}
                                 placeholder="Ex: 8348122837876"
+                                type="text"
                                 className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
                             />
                         </div>
@@ -689,28 +608,24 @@ export function StockTable() {
                                 />
                             </div>
                         </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="editProductCategory" className="text-white">Categoria</Label>
-                            <Select value={editProductCategory} onValueChange={setEditProductCategory}>
-                                <SelectTrigger id="editProductCategory" className="bg-zinc-800 text-white border-zinc-700">
-                                    <SelectValue placeholder="Selecione uma categoria" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-800 text-white border-zinc-700">
-                                    <SelectItem value="salgado">Salgado</SelectItem>
-                                    <SelectItem value="doce">Doce</SelectItem>
-                                    <SelectItem value="bolo">Bolo</SelectItem>
-                                    <SelectItem value="outros">Outros</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
                     </div>
-                    <DialogFooter className="mt-4">
-                        <Button variant="outline" onClick={() => setIsEditProductDialogOpen(false)} className="border-zinc-700 text-white hover:bg-zinc-800">
-                            Cancelar
+                    <DialogFooter className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            onClick={() => handleDeleteProduct(editingProduct?.id || '')}
+                            className="w-full sm:w-auto text-red-500 hover:bg-zinc-700 hover:text-red-400 border border-red-500 rounded-md"
+                            disabled={loading}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Excluir Produto
                         </Button>
-                        <Button onClick={updateProduct} className="bg-white text-black hover:bg-gray-200">
-                            Salvar Alterações
-                        </Button>
+                        <div className="flex gap-2 w-full sm:w-auto justify-end">
+                            <Button variant="outline" onClick={() => setIsEditProductDialogOpen(false)} className="w-full sm:w-auto bg-zinc-700 text-white hover:bg-zinc-600 border-zinc-600">
+                                Cancelar
+                            </Button>
+                            <Button onClick={updateProduct} className="w-full sm:w-auto bg-white text-black hover:bg-gray-200">
+                                Salvar Alterações
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
