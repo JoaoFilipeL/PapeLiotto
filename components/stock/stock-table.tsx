@@ -498,16 +498,16 @@ export function StockTable() {
                                             {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-right flex items-center justify-end gap-2">
+                                    <TableCell className="text-right flex items-center justify-end gap-4">
                                         <Button
                                             onClick={(e) => { e.stopPropagation(); updateQuantityInTable(item.id, item.quantity, -1); }}
-                                            className="bg-red-600 hover:bg-red-700 text-white rounded-md h-10 w-14"
+                                            className="cursor-pointer bg-red-500 hover:bg-red-600 text-white rounded-2xl h-10 w-22"
                                         >
                                             <ArrowDown className="h-5 w-5" />
                                         </Button>
                                         <Button
                                             onClick={(e) => { e.stopPropagation(); updateQuantityInTable(item.id, item.quantity, 1); }}
-                                            className="bg-green-600 hover:bg-green-700 text-white rounded-md h-10 w-14"
+                                            className="cursor-pointer bg-green-500 hover:bg-green-600 text-white rounded-2xl h-10 w-2"
                                         >
                                             <ArrowUp className="h-5 w-5" />
                                         </Button>
