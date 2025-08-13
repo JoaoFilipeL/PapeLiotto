@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, Trash2, ChevronUp, ChevronDown, Edit, Loader2 } from "lucide-react"
+import { Search, Plus, Trash2, ArrowUp, ArrowDown, Loader2 } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -29,10 +29,20 @@ interface StockItem {
     price: number
 }
 
-const statusColors: Record<string, string> = {
+const statusColors: Record<StockItem['status'], string> = {
     ok: "bg-green-600 text-white hover:bg-green-700",
     baixo: "bg-yellow-600 text-white hover:bg-yellow-700",
     crítico: "bg-red-600 text-white hover:bg-red-700",
+}
+
+const initialNewItemState = {
+    name: "",
+    barcode: "",
+    supplier: "",
+    quantity: "",
+    unit: "un",
+    minQuantity: "",
+    price: "",
 }
 
 export function StockTable() {
@@ -42,25 +52,20 @@ export function StockTable() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const [newItemName, setNewItemName] = useState("")
-    const [newItemBarcode, setNewItemBarcode] = useState("")
-    const [newItemSupplier, setNewItemSupplier] = useState("")
-    const [newItemQuantity, setNewItemQuantity] = useState("")
-    const [newItemUnit, setNewItemUnit] = useState("un")
-    const [newItemMinQuantity, setNewItemMinQuantity] = useState("")
-    const [newItemPrice, setNewItemPrice] = useState("");
+    const [newItem, setNewItem] = useState(initialNewItemState);
 
     const [isEditProductDialogOpen, setIsEditProductDialogOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<StockItem | null>(null);
-    const [editProductName, setEditProductName] = useState("");
-    const [editProductBarcode, setEditProductBarcode] = useState("");
-    const [editProductSupplier, setEditProductSupplier] = useState("");
-    const [editProductQuantity, setEditProductQuantity] = useState("");
-    const [editProductUnit, setEditProductUnit] = useState("un");
-    const [editProductMinQuantity, setEditProductMinQuantity] = useState("");
-    const [editProductPrice, setEditProductPrice] = useState("");
     const [editProductFormError, setEditProductFormError] = useState<string | null>(null);
-
+    const [editForm, setEditForm] = useState({
+        name: "",
+        barcode: "",
+        supplier: "",
+        quantity: "",
+        unit: "",
+        minQuantity: "",
+        price: ""
+    });
 
     const supabase = createClientComponentClient();
 
@@ -121,10 +126,7 @@ export function StockTable() {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'stock' },
-                (payload) => {
-                    console.log('Mudança recebida em tempo real no estoque!', payload);
-                    fetchStock();
-                }
+                () => fetchStock()
             )
             .subscribe();
 
@@ -141,12 +143,29 @@ export function StockTable() {
         )
         .sort((a, b) => a.name.localeCompare(b.name));
 
-    const addNewItem = async () => {
-        const quantity = Number.parseFloat(newItemQuantity);
-        const minQuantity = Number.parseFloat(newItemMinQuantity);
-        const price = Number.parseFloat(newItemPrice);
+    const handleNewItemChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setNewItem(prev => ({
+            ...prev,
+            [id]: id === 'barcode' ? value.replace(/\D/g, '').substring(0, 13) : value
+        }));
+    };
 
-        if (!newItemName || !newItemBarcode || !newItemSupplier || isNaN(quantity) || isNaN(minQuantity) || isNaN(price) || quantity < 0 || minQuantity < 0 || price < 0) {
+    const handleEditFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setEditForm(prev => ({
+            ...prev,
+            [id]: id === 'barcode' ? value.replace(/\D/g, '').substring(0, 13) : value
+        }));
+    };
+
+    const addNewItem = async () => {
+        const { name, barcode, supplier, quantity, unit, minQuantity, price } = newItem;
+        const parsedQuantity = Number.parseFloat(quantity);
+        const parsedMinQuantity = Number.parseFloat(minQuantity);
+        const parsedPrice = Number.parseFloat(price);
+
+        if (!name || !barcode || !supplier || isNaN(parsedQuantity) || isNaN(parsedMinQuantity) || isNaN(parsedPrice) || parsedQuantity < 0 || parsedMinQuantity < 0 || parsedPrice < 0) {
             setError("Por favor, preencha todos os campos corretamente e com valores válidos.");
             return;
         }
@@ -154,17 +173,15 @@ export function StockTable() {
         try {
             const { error } = await supabase
                 .from('stock')
-                .insert([
-                    {
-                        name: newItemName,
-                        barcode: newItemBarcode,
-                        supplier: newItemSupplier,
-                        quantity: quantity,
-                        unit: newItemUnit,
-                        min_quantity: minQuantity,
-                        price: price,
-                    },
-                ]);
+                .insert([{
+                    name,
+                    barcode,
+                    supplier,
+                    quantity: parsedQuantity,
+                    unit,
+                    min_quantity: parsedMinQuantity,
+                    price: parsedPrice,
+                }]);
 
             if (error) {
                 console.error("Erro ao adicionar novo item:", error);
@@ -172,22 +189,12 @@ export function StockTable() {
                 return;
             }
 
-            setNewItemName("");
-            setNewItemBarcode("");
-            setNewItemSupplier("");
-            setNewItemQuantity("");
-            setNewItemUnit("un");
-            setNewItemMinQuantity("");
-            setNewItemPrice("");
+            setNewItem(initialNewItemState);
             setIsAddDialogOpen(false);
             setError(null);
         } catch (err: unknown) {
             console.error("Erro inesperado ao adicionar item:", err);
-            if (err instanceof Error) {
-                setError(err.message || "Erro ao adicionar item.");
-            } else {
-                setError("Ocorreu um erro desconhecido ao adicionar item.");
-            }
+            setError("Ocorreu um erro desconhecido ao adicionar item.");
         }
     };
 
@@ -209,14 +216,9 @@ export function StockTable() {
             }
         } catch (err: unknown) {
             console.error("Erro inesperado ao atualizar quantidade:", err);
-            if (err instanceof Error) {
-                setError(err.message || "Erro ao atualizar quantidade.");
-            } else {
-                setError("Ocorreu um erro desconhecido ao atualizar quantidade.");
-            }
+            setError("Ocorreu um erro desconhecido ao atualizar quantidade.");
         }
     };
-
 
     const handleDeleteProduct = async (productId: string) => {
         if (!window.confirm("Tem certeza que deseja excluir este produto do estoque?")) {
@@ -239,11 +241,7 @@ export function StockTable() {
             }
         } catch (err: unknown) {
             console.error("Erro inesperado ao excluir produto:", err);
-            if (err instanceof Error) {
-                setError(err.message || "Erro ao excluir produto.");
-            } else {
-                setError("Ocorreu um erro desconhecido ao excluir produto.");
-            }
+            setError("Ocorreu um erro desconhecido ao excluir produto.");
         } finally {
             setLoading(false);
         }
@@ -251,13 +249,15 @@ export function StockTable() {
 
     const openEditProductDialog = (product: StockItem) => {
         setEditingProduct(product);
-        setEditProductName(product.name);
-        setEditProductBarcode(product.barcode);
-        setEditProductSupplier(product.supplier);
-        setEditProductQuantity(product.quantity.toString());
-        setEditProductUnit(product.unit);
-        setEditProductMinQuantity(product.minQuantity.toString());
-        setEditProductPrice(product.price.toFixed(2));
+        setEditForm({
+            name: product.name,
+            barcode: product.barcode,
+            supplier: product.supplier,
+            quantity: product.quantity.toString(),
+            unit: product.unit,
+            minQuantity: product.minQuantity.toString(),
+            price: product.price.toFixed(2),
+        });
         setEditProductFormError(null);
         setIsEditProductDialogOpen(true);
     };
@@ -265,11 +265,12 @@ export function StockTable() {
     const updateProduct = async () => {
         if (!editingProduct) return;
 
-        const quantity = Number.parseFloat(editProductQuantity);
-        const minQuantity = Number.parseFloat(editProductMinQuantity);
-        const price = Number.parseFloat(editProductPrice);
+        const { name, barcode, supplier, quantity, unit, minQuantity, price } = editForm;
+        const parsedQuantity = Number.parseFloat(quantity);
+        const parsedMinQuantity = Number.parseFloat(minQuantity);
+        const parsedPrice = Number.parseFloat(price);
 
-        if (!editProductName || !editProductBarcode || !editProductSupplier || isNaN(quantity) || isNaN(minQuantity) || isNaN(price) || quantity < 0 || minQuantity < 0 || price < 0) {
+        if (!name || !barcode || !supplier || isNaN(parsedQuantity) || isNaN(parsedMinQuantity) || isNaN(parsedPrice) || parsedQuantity < 0 || parsedMinQuantity < 0 || parsedPrice < 0) {
             setEditProductFormError("Por favor, preencha todos os campos corretamente e com valores válidos.");
             return;
         }
@@ -278,13 +279,13 @@ export function StockTable() {
             const { error } = await supabase
                 .from('stock')
                 .update({
-                    name: editProductName,
-                    barcode: editProductBarcode,
-                    supplier: editProductSupplier,
-                    quantity: quantity,
-                    unit: editProductUnit,
-                    min_quantity: minQuantity,
-                    price: price,
+                    name,
+                    barcode,
+                    supplier,
+                    quantity: parsedQuantity,
+                    unit,
+                    min_quantity: parsedMinQuantity,
+                    price: parsedPrice,
                 })
                 .eq('id', editingProduct.id);
 
@@ -299,13 +300,105 @@ export function StockTable() {
             setEditProductFormError(null);
         } catch (err: unknown) {
             console.error("Erro inesperado ao atualizar produto:", err);
-            if (err instanceof Error) {
-                setEditProductFormError(err.message || "Erro ao atualizar produto.");
-            } else {
-                setEditProductFormError("Ocorreu um erro desconhecido ao atualizar produto.");
-            }
+            setEditProductFormError("Ocorreu um erro desconhecido ao atualizar produto.");
         }
     };
+
+    const renderDialogContent = (isEdit = false) => {
+        const formState = isEdit ? editForm : newItem;
+        const handleInputChange = isEdit ? handleEditFormChange : handleNewItemChange;
+        const formError = isEdit ? editProductFormError : error;
+
+        return (
+            <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] pr-4">
+                {formError && (
+                    <div className="bg-red-900/20 text-red-500 p-3 rounded-md text-sm">
+                        {formError}
+                    </div>
+                )}
+                <div className="grid gap-2">
+                    <Label htmlFor="name" className="text-white">Nome do Produto</Label>
+                    <Input
+                        id="name"
+                        value={formState.name}
+                        onChange={handleInputChange}
+                        placeholder="Ex: Caderno 12 Materias"
+                        className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="barcode" className="text-white">Código de Barras</Label>
+                    <Input
+                        id="barcode"
+                        value={formState.barcode}
+                        onChange={handleInputChange}
+                        placeholder="Ex: 8348122837876"
+                        type="text"
+                        className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="supplier" className="text-white">Fornecedor</Label>
+                    <Input
+                        id="supplier"
+                        value={formState.supplier}
+                        onChange={handleInputChange}
+                        placeholder="Ex: Tilibra"
+                        className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
+                    />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="quantity" className="text-white">Quantidade {isEdit ? '' : 'Inicial'}</Label>
+                        <Input
+                            id="quantity"
+                            type="number"
+                            min="0"
+                            value={formState.quantity}
+                            onChange={handleInputChange}
+                            className="bg-zinc-800 text-white border-zinc-700"
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="price" className="text-white">Preço (R$)</Label>
+                        <Input
+                            id="price"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formState.price}
+                            onChange={handleInputChange}
+                            className="bg-zinc-800 text-white border-zinc-700"
+                        />
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="minQuantity" className="text-white">Quantidade Mínima</Label>
+                        <Input
+                            id="minQuantity"
+                            type="number"
+                            min="0"
+                            value={formState.minQuantity}
+                            onChange={handleInputChange}
+                            className="bg-zinc-800 text-white border-zinc-700"
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="unit" className="text-white">Unidade</Label>
+                        <Input
+                            id="unit"
+                            value={formState.unit}
+                            onChange={handleInputChange}
+                            placeholder="Ex: un"
+                            disabled
+                            className="bg-zinc-700 text-zinc-400 border-zinc-600 cursor-not-allowed"
+                        />
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="space-y-6 p-2 md:p-4 lg:p-6 bg-zinc-900 rounded-xl">
@@ -340,88 +433,7 @@ export function StockTable() {
                             <DialogTitle className="text-white">Adicionar Novo Produto</DialogTitle>
                             <DialogDescription className="text-zinc-400">Preencha os detalhes do novo produto.</DialogDescription>
                         </DialogHeader>
-                        <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] pr-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="name" className="text-white">Nome do Produto</Label>
-                                <Input
-                                    id="name"
-                                    value={newItemName}
-                                    onChange={(e) => setNewItemName(e.target.value)}
-                                    placeholder="Ex: Caderno 12 Materias"
-                                    className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="barcode" className="text-white">Código de Barras</Label>
-                                <Input
-                                    id="barcode"
-                                    value={newItemBarcode}
-                                    onChange={(e) => setNewItemBarcode(e.target.value.replace(/\D/g, '').substring(0, 13))}
-                                    placeholder="Ex: 8348122837876"
-                                    type="text"
-                                    className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="supplier" className="text-white">Fornecedor</Label>
-                                <Input
-                                    id="supplier"
-                                    value={newItemSupplier}
-                                    onChange={(e) => setNewItemSupplier(e.target.value)}
-                                    placeholder="Ex: Tilibra"
-                                    className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="quantity" className="text-white">Quantidade Inicial</Label>
-                                    <Input
-                                        id="quantity"
-                                        type="number"
-                                        min="0"
-                                        value={newItemQuantity}
-                                        onChange={(e) => setNewItemQuantity(e.target.value)}
-                                        className="bg-zinc-800 text-white border-zinc-700"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="price" className="text-white">Preço (R$)</Label>
-                                    <Input
-                                        id="price"
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={newItemPrice}
-                                        onChange={(e) => setNewItemPrice(e.target.value)}
-                                        className="bg-zinc-800 text-white border-zinc-700"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="minQuantity" className="text-white">Quantidade Mínima</Label>
-                                    <Input
-                                        id="minQuantity"
-                                        type="number"
-                                        min="0"
-                                        value={newItemMinQuantity}
-                                        onChange={(e) => setNewItemMinQuantity(e.target.value)}
-                                        className="bg-zinc-800 text-white border-zinc-700"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="unit" className="text-white">Unidade</Label>
-                                    <Input
-                                        id="unit"
-                                        value={newItemUnit}
-                                        onChange={(e) => setNewItemUnit(e.target.value)}
-                                        placeholder="Ex: un"
-                                        disabled
-                                        className="bg-zinc-700 text-zinc-400 border-zinc-600 cursor-not-allowed"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        {renderDialogContent()}
                         <DialogFooter className="mt-4">
                             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="border-zinc-700 text-white hover:bg-zinc-800">
                                 Cancelar
@@ -464,10 +476,10 @@ export function StockTable() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            sortedAndFilteredStock.map((item) => (
+                            sortedAndFilteredStock.map((item, index) => (
                                 <TableRow
                                     key={item.id}
-                                    className="border-b border-zinc-700 hover:bg-zinc-700 transition-colors cursor-pointer"
+                                    className={`border-b border-zinc-700 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-zinc-800' : 'bg-zinc-850'}`}
                                     onClick={() => openEditProductDialog(item)}
                                 >
                                     <TableCell className="font-medium text-white">
@@ -488,20 +500,16 @@ export function StockTable() {
                                     </TableCell>
                                     <TableCell className="text-right flex items-center justify-end gap-2">
                                         <Button
-                                            variant="ghost"
-                                            size="lg"
                                             onClick={(e) => { e.stopPropagation(); updateQuantityInTable(item.id, item.quantity, -1); }}
-                                            className="text-red-500 hover:bg-zinc-700 hover:text-red-400 border border-red-500 rounded-md h-10 w-10"
+                                            className="bg-red-600 hover:bg-red-700 text-white rounded-md h-10 w-14"
                                         >
-                                            <ChevronDown className="h-5 w-5" />
+                                            <ArrowDown className="h-5 w-5" />
                                         </Button>
                                         <Button
-                                            variant="ghost"
-                                            size="lg"
                                             onClick={(e) => { e.stopPropagation(); updateQuantityInTable(item.id, item.quantity, 1); }}
-                                            className="text-green-500 hover:bg-zinc-700 hover:text-green-400 border border-green-500 rounded-md h-10 w-10"
+                                            className="bg-green-600 hover:bg-green-700 text-white rounded-md h-10 w-14"
                                         >
-                                            <ChevronUp className="h-5 w-5" />
+                                            <ArrowUp className="h-5 w-5" />
                                         </Button>
                                     </TableCell>
                                 </TableRow>
@@ -522,94 +530,8 @@ export function StockTable() {
                         <DialogTitle className="text-white">Editar Produto: {editingProduct?.name}</DialogTitle>
                         <DialogDescription className="text-zinc-400">Edite os detalhes do produto.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4 overflow-y-auto max-h-[70vh] pr-4">
-                        {editProductFormError && (
-                            <div className="bg-red-900/20 text-red-500 p-3 rounded-md text-sm">
-                                {editProductFormError}
-                            </div>
-                        )}
-                        <div className="grid gap-2">
-                            <Label htmlFor="editProductName" className="text-white">Nome do Produto</Label>
-                            <Input
-                                id="editProductName"
-                                value={editProductName}
-                                onChange={(e) => setEditProductName(e.target.value)}
-                                placeholder="Ex: Caderno 12 Materias"
-                                className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="editProductBarcode" className="text-white">Código de Barras</Label>
-                            <Input
-                                id="editProductBarcode"
-                                value={editProductBarcode}
-                                onChange={(e) => setEditProductBarcode(e.target.value.replace(/\D/g, '').substring(0, 13))}
-                                placeholder="Ex: 8348122837876"
-                                type="text"
-                                className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
-                            />
-                        </div>
-                        <div className="grid gap-2">
-                            <Label htmlFor="editProductSupplier" className="text-white">Fornecedor</Label>
-                            <Input
-                                id="editProductSupplier"
-                                value={editProductSupplier}
-                                onChange={(e) => setEditProductSupplier(e.target.value)}
-                                placeholder="Ex: Tilibra"
-                                className="bg-zinc-800 text-white border-zinc-700 placeholder:text-zinc-500"
-                            />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="editProductQuantity" className="text-white">Quantidade</Label>
-                                <Input
-                                    id="editProductQuantity"
-                                    type="number"
-                                    min="0"
-                                    value={editProductQuantity}
-                                    onChange={(e) => setEditProductQuantity(e.target.value)}
-                                    className="bg-zinc-800 text-white border-zinc-700"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="editProductPrice" className="text-white">Preço (R$)</Label>
-                                <Input
-                                    id="editProductPrice"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={editProductPrice}
-                                    onChange={(e) => setEditProductPrice(e.target.value)}
-                                    className="bg-zinc-800 text-white border-zinc-700"
-                                />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="editProductMinQuantity" className="text-white">Quantidade Mínima</Label>
-                                <Input
-                                    id="editProductMinQuantity"
-                                    type="number"
-                                    min="0"
-                                    value={editProductMinQuantity}
-                                    onChange={(e) => setEditProductMinQuantity(e.target.value)}
-                                    className="bg-zinc-800 text-white border-zinc-700"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="editProductUnit" className="text-white">Unidade</Label>
-                                <Input
-                                    id="editProductUnit"
-                                    value={editProductUnit}
-                                    onChange={(e) => setEditProductUnit(e.target.value)}
-                                    placeholder="Ex: un"
-                                    disabled
-                                    className="bg-zinc-700 text-zinc-400 border-zinc-600 cursor-not-allowed"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <DialogFooter className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-2">
+                    {renderDialogContent(true)}
+                    <DialogFooter className="mt-4 mr-5 flex flex-col sm:flex-row justify-between items-center gap-12">
                         <Button
                             variant="ghost"
                             onClick={() => handleDeleteProduct(editingProduct?.id || '')}
