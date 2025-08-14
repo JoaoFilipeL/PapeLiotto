@@ -1,13 +1,12 @@
 'use client';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-// Importa os ícones necessários para os itens de navegação
 import { LayoutDashboard, Box, ShoppingCart, ClipboardList } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Importa a função cn para classes condicionais
+import { cn } from '@/lib/utils'; 
 
 export function DashboardNavBar({ className }: React.HTMLAttributes<HTMLDivElement>) {
   const navItems = [
-    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" }, // Adicionado Dashboard
+    { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" }, 
     { href: "/stock", icon: Box, label: "Estoque" },
     { href: "/orders", icon: ShoppingCart, label: "Pedidos" },
     { href: "/budgets", icon: ClipboardList, label: "Orçamentos" },
@@ -16,7 +15,6 @@ export function DashboardNavBar({ className }: React.HTMLAttributes<HTMLDivEleme
   return (
     <nav
       className={cn(
-        // Alinha os itens à esquerda com justify-start
         `w-full bg-black text-white p-2 border-b border-zinc-800 flex justify-start gap-4 overflow-x-auto px-4`,
         className
       )}
