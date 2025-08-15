@@ -1,7 +1,8 @@
 'use client';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { LayoutDashboard, Box, ShoppingCart, ClipboardList } from 'lucide-react';
+// Importa o ícone 'Users' para representar os clientes
+import { LayoutDashboard, Box, ShoppingCart, ClipboardList, Users } from 'lucide-react';
 import { cn } from '@/lib/utils'; 
 
 export function DashboardNavBar({ className }: React.HTMLAttributes<HTMLDivElement>) {
@@ -10,6 +11,8 @@ export function DashboardNavBar({ className }: React.HTMLAttributes<HTMLDivEleme
     { href: "/stock", icon: Box, label: "Estoque" },
     { href: "/orders", icon: ShoppingCart, label: "Pedidos" },
     { href: "/budgets", icon: ClipboardList, label: "Orçamentos" },
+    // Adiciona o novo item de navegação para a página de Clientes
+    { href: "/customers", icon: Users, label: "Clientes" },
   ];
 
   return (
