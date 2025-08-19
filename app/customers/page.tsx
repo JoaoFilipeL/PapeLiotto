@@ -1,5 +1,5 @@
 import { DashboardApp } from "@/components/dashboard/dashboard-app"
-import { CustomersList } from "@/components/customers/customers-list" // Importa o novo componente
+import { CustomersList } from "@/components/customers/customers-list" 
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect, RedirectType } from 'next/navigation';
@@ -21,7 +21,7 @@ export default async function CustomersPage() {
   return (
     <DashboardApp>
       <div className="grid gap-8">
-        <CustomersList /> {/* Renderiza o componente da lista de clientes */}
+        <CustomersList /> 
       </div>
     </DashboardApp>
   )

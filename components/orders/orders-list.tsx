@@ -89,17 +89,95 @@ export function OrdersList() {
     const supabase = createClientComponentClient();
 
     const fetchData = useCallback(async () => {
-        // A função fetchData permanece a mesma
+        setLoading(true);
+        setError(null);
+        try {
+            const { data: customersData, error: customersError } = await supabase.from('customers').select('*').order('name');
+            if (customersError) throw customersError;
+            setCustomers(customersData);
+
+            const { data: productsData, error: productsError } = await supabase.from('stock').select('*').order('name');
+            if (productsError) throw productsError;
+            setProducts(productsData.map(p => ({ ...p, price: parseFloat(p.price) })));
+
+            const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+            if (ordersError) throw ordersError;
+
+            const orderIds = ordersData.map(o => o.id);
+            const { data: itemsData, error: itemsError } = await supabase.from('order_items').select('*').in('order_id', orderIds);
+            if (itemsError) throw itemsError;
+
+            const combinedOrders: Order[] = ordersData.map(order => ({
+                ...order,
+                total_amount: parseFloat(order.total_amount),
+                items: itemsData.filter(item => item.order_id === order.id).map(item => ({...item, unit_price: parseFloat(item.unit_price)}))
+            }));
+            
+            setOrders(combinedOrders);
+
+            const lastId = ordersData.length > 0 ? Math.max(...ordersData.map(o => parseInt(o.order_code.split('-')[1]))) : 0;
+            setNextOrderCode(`PED-${(lastId + 1).toString().padStart(4, '0')}`);
+        } catch (err: any) {
+            setError("Falha ao carregar dados.");
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
     }, [supabase]);
 
     useEffect(() => {
-        // O useEffect permanece o mesmo
+        fetchData();
+        const channel = supabase.channel('orders_realtime').on('postgres_changes', { event: '*', schema: 'public' }, fetchData).subscribe();
+        return () => { supabase.removeChannel(channel); };
     }, [supabase, fetchData]);
 
     const calculateTotal = (items: OrderItem[]) => items.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
 
     const handleCreateOrder = async () => {
-        // A função handleCreateOrder permanece a mesma
+        if (!addSelectedCustomerId || addOrderItems.length === 0 || !addPaymentMethod) {
+            setAddFormError("Preencha: Cliente, Forma de Pagamento e adicione ao menos um item.");
+            return;
+        }
+        setLoading(true);
+        setAddFormError(null);
+        try {
+            for (const item of addOrderItems) {
+                const productInStock = products.find(p => p.id === item.product_id);
+                if (!productInStock || productInStock.quantity < item.quantity) {
+                    throw new Error(`Estoque insuficiente para "${item.product_name}".`);
+                }
+            }
+            const customer = customers.find(c => c.id === addSelectedCustomerId);
+            if (!customer) throw new Error("Cliente não encontrado.");
+            const total_amount = calculateTotal(addOrderItems);
+            const { data: orderData, error: orderError } = await supabase
+                .from('orders').insert({
+                    order_code: nextOrderCode,
+                    customer_id: addSelectedCustomerId,
+                    customer_name: customer.name,
+                    address: addAddress,
+                    order_date: addOrderDate,
+                    payment_method: addPaymentMethod,
+                    total_amount: total_amount,
+                }).select().single();
+            if (orderError) throw orderError;
+            const itemsToInsert = addOrderItems.map(item => ({
+                order_id: orderData.id, ...item
+            }));
+            const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
+            if (itemsError) throw itemsError;
+            for (const item of addOrderItems) {
+                const product = products.find(p => p.id === item.product_id);
+                const newQuantity = (product?.quantity || 0) - item.quantity;
+                const { error: stockUpdateError } = await supabase.from('stock').update({ quantity: newQuantity }).eq('id', item.product_id);
+                if (stockUpdateError) throw new Error(`Falha ao atualizar estoque para ${item.product_name}.`);
+            }
+            setIsAddDialogOpen(false);
+        } catch (err: any) {
+            setAddFormError(err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleUpdateOrder = async () => {
@@ -295,7 +373,7 @@ export function OrdersList() {
             </div>
             
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                 {/* O Modal de Adicionar Pedido permanece o mesmo */}
+                 {/* Modal de Adicionar Pedido aqui */}
             </Dialog>
 
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -380,7 +458,36 @@ export function OrdersList() {
             </Dialog>
 
             <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-                {/* Modal de Detalhes aqui */}
+                <DialogContent className="max-w-lg bg-zinc-900 text-white border-zinc-700">
+                    <DialogHeader>
+                        <DialogTitle>Detalhes do Pedido: {selectedOrderDetails?.order_code}</DialogTitle>
+                    </DialogHeader>
+                    {selectedOrderDetails && (
+                        <div className="py-4 space-y-4">
+                            <p><strong>Cliente:</strong> {selectedOrderDetails.customer_name}</p>
+                            <p><strong>Endereço:</strong> {selectedOrderDetails.address}</p>
+                            <p><strong>Data:</strong> {new Date(selectedOrderDetails.order_date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
+                            <p><strong>Pagamento:</strong> {selectedOrderDetails.payment_method}</p>
+                            <div>
+                                <strong>Itens:</strong>
+                                <div className="mt-2 space-y-1">
+                                {selectedOrderDetails.items.map(item => (
+                                    <div key={item.product_id} className="flex justify-between text-sm">
+                                        <span>{item.quantity}x {item.product_name}</span>
+                                        <span>{(item.unit_price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                    </div>
+                                ))}
+                                </div>
+                            </div>
+                             <div className="pt-4 border-t border-zinc-700 text-right font-bold text-lg">
+                                Total: {selectedOrderDetails.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                             </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)}>Fechar</Button>
+                    </DialogFooter>
+                </DialogContent>
             </Dialog>
         </div>
     );

@@ -10,13 +10,11 @@ import {
     DialogDescription,
     DialogFooter,
     DialogHeader,
-    DialogTitle,
-    DialogTrigger,
+    DialogTitle
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
-// --- Interfaces de Tipos ---
 interface Customer {
     id: string;
     name: string;
@@ -30,15 +28,12 @@ const initialFormState = {
     address: "",
 };
 
-// --- Componente Principal ---
 export function CustomersList() {
-    // --- Estados ---
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // --- Estados dos Modais ---
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [formState, setFormState] = useState(initialFormState);
@@ -47,7 +42,6 @@ export function CustomersList() {
 
     const supabase = createClientComponentClient();
 
-    // --- Funções de Dados (CRUD) ---
     const fetchCustomers = useCallback(async () => {
         setLoading(true);
         try {
@@ -86,7 +80,6 @@ export function CustomersList() {
 
         try {
             if (isEditing && editingCustomerId) {
-                // Atualizar cliente existente
                 const { error } = await supabase
                     .from('customers')
                     .update({
@@ -97,7 +90,6 @@ export function CustomersList() {
                     .eq('id', editingCustomerId);
                 if (error) throw error;
             } else {
-                // Adicionar novo cliente
                 const { error } = await supabase
                     .from('customers')
                     .insert({
@@ -128,7 +120,6 @@ export function CustomersList() {
         }
     };
     
-    // --- Funções de Controle dos Modais ---
     const openAddForm = () => {
         setIsEditing(false);
         setFormState(initialFormState);
@@ -152,8 +143,7 @@ export function CustomersList() {
     const closeForm = () => {
         setIsFormOpen(false);
     };
-    
-    // --- Lógica de Renderização ---
+
     const filteredCustomers = customers.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.phone?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -177,8 +167,6 @@ export function CustomersList() {
                     </Button>
                 </div>
             </div>
-
-            {/* Lista de Clientes */}
             <div className="space-y-2">
                 {loading && <p className="text-center text-zinc-400">Carregando...</p>}
                 {error && <p className="text-center text-red-500">{error}</p>}
@@ -201,8 +189,6 @@ export function CustomersList() {
                     </div>
                 ))}
             </div>
-            
-            {/* Modal de Adicionar/Editar Cliente */}
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogContent className="max-w-md w-[90%] bg-zinc-900 text-white border-zinc-700">
                     <DialogHeader>
