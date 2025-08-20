@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Label } from "@/components/ui/label"
 
-// --- Interfaces de Tipos ---
 interface Product {
     id: string;
     name: string;
@@ -50,9 +49,7 @@ interface Order {
     items: OrderItem[];
 }
 
-// --- Componente Principal ---
 export function OrdersList() {
-    // --- Estados ---
     const [orders, setOrders] = useState<Order[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -60,7 +57,6 @@ export function OrdersList() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // --- Estados do Modal de Adicionar ---
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [addFormError, setAddFormError] = useState<string | null>(null);
     const [nextOrderCode, setNextOrderCode] = useState("");
@@ -71,7 +67,6 @@ export function OrdersList() {
     const [addOrderItems, setAddOrderItems] = useState<OrderItem[]>([]);
     const [addProductSearch, setAddProductSearch] = useState("");
 
-    // --- Estados do Modal de Edição ---
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
     const [editCustomerId, setEditCustomerId] = useState<string>("");
@@ -82,7 +77,6 @@ export function OrdersList() {
     const [editProductSearch, setEditProductSearch] = useState("");
     const [editFormError, setEditFormError] = useState<string | null>(null);
 
-    // --- Estados do Modal de Detalhes ---
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
     const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
 
