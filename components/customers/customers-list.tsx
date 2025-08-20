@@ -3,7 +3,7 @@ import type React from "react"
 import { useState, useEffect, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Plus, Loader2, Edit, Trash2, User } from "lucide-react"
+import { Plus, Loader2, Edit, Trash2, User } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -51,7 +51,7 @@ export function CustomersList() {
                 .order('name', { ascending: true });
             if (error) throw error;
             setCustomers(data);
-        } catch (err: any) {
+        } catch (err) {
             setError("Falha ao carregar clientes.");
             console.error(err);
         } finally {
@@ -100,9 +100,9 @@ export function CustomersList() {
                 if (error) throw error;
             }
             closeForm();
-        } catch (err: any) {
-            setFormError(`Erro ao salvar cliente: ${err.message}`);
-            console.error(err);
+        } catch (err) {
+            if (err instanceof Error) setFormError(`Erro ao salvar cliente: ${err.message}`);
+            else setFormError("Ocorreu um erro desconhecido ao salvar o cliente.");
         } finally {
             setLoading(false);
         }
@@ -113,9 +113,9 @@ export function CustomersList() {
             try {
                 const { error } = await supabase.from('customers').delete().eq('id', customerId);
                 if (error) throw error;
-            } catch (err: any) {
-                setError(`Erro ao excluir cliente: ${err.message}`);
-                console.error(err);
+            } catch (err) {
+                if (err instanceof Error) setError(`Erro ao excluir cliente: ${err.message}`);
+                else setError("Ocorreu um erro desconhecido ao excluir o cliente.");
             }
         }
     };
@@ -151,9 +151,9 @@ export function CustomersList() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <h1 className="text-3xl font-bold text-white">Clientes</h1>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 w-full sm:w-auto">
                      <Input
                         type="search"
                         placeholder="Buscar clientes..."
@@ -168,17 +168,17 @@ export function CustomersList() {
                 </div>
             </div>
             <div className="space-y-2">
-                {loading && <p className="text-center text-zinc-400">Carregando...</p>}
+                {loading && <div className="text-center text-zinc-400 py-8"><Loader2 className="h-8 w-8 animate-spin mx-auto"/></div>}
                 {error && <p className="text-center text-red-500">{error}</p>}
                 {!loading && filteredCustomers.map(customer => (
-                    <div key={customer.id} className="grid grid-cols-4 gap-4 items-center bg-zinc-800 p-4 rounded-lg">
-                        <div className="col-span-1 flex items-center">
+                    <div key={customer.id} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-center bg-zinc-800 p-4 rounded-lg">
+                        <div className="sm:col-span-1 flex items-center">
                             <User className="h-5 w-5 mr-3 text-zinc-400"/>
                             <span className="text-white font-medium truncate">{customer.name}</span>
                         </div>
-                        <span className="col-span-1 text-zinc-300 truncate">{customer.phone || 'Não informado'}</span>
-                        <span className="col-span-1 text-zinc-300 truncate">{customer.address || 'Não informado'}</span>
-                        <div className="col-span-1 flex justify-end gap-2">
+                        <span className="sm:col-span-1 text-zinc-300 truncate">{customer.phone || 'Não informado'}</span>
+                        <span className="sm:col-span-1 text-zinc-300 truncate">{customer.address || 'Não informado'}</span>
+                        <div className="sm:col-span-1 flex justify-end gap-2">
                            <Button variant="ghost" size="icon" onClick={() => openEditForm(customer)}>
                                 <Edit className="h-5 w-5 text-zinc-400 hover:text-white"/>
                            </Button>

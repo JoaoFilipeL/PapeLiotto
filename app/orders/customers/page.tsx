@@ -4,23 +4,21 @@ import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect, RedirectType } from 'next/navigation';
 
-export default async function CustomersPage() {
+export default async function OrdersCustomersPage() {
   let loggedIn = false;
   try {
     const supabase = createServerComponentClient({ cookies });
     const { data: { session } } = await supabase.auth.getSession();
-
     if (session) loggedIn = true;
-
   } catch (error) {
-    console.error('Error in CustomersPage component:', error);
+    console.error('Error in OrdersCustomersPage component:', error);
   } finally {
     if (!loggedIn) redirect('/', RedirectType.replace);
   }
 
   return (
     <DashboardApp>
-      <div className="grid gap-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <CustomersList /> 
       </div>
     </DashboardApp>

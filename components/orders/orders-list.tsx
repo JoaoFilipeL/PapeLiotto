@@ -1,13 +1,13 @@
 "use client"
 import type React from "react"
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Plus, Loader2, Edit, Trash2, Archive, Eye, Minus } from "lucide-react"
+import { Search, Plus, Loader2, Edit, Trash2, Archive, Eye, Minus, Users } from "lucide-react"
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -92,7 +92,7 @@ export function OrdersList() {
 
             const { data: productsData, error: productsError } = await supabase.from('stock').select('*').order('name');
             if (productsError) throw productsError;
-            setProducts(productsData.map(p => ({ ...p, price: parseFloat(p.price) })));
+            setProducts(productsData.map(p => ({ ...p, price: parseFloat(p.price as any) })));
 
             const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
             if (ordersError) throw ordersError;
@@ -103,15 +103,15 @@ export function OrdersList() {
 
             const combinedOrders: Order[] = ordersData.map(order => ({
                 ...order,
-                total_amount: parseFloat(order.total_amount),
-                items: itemsData.filter(item => item.order_id === order.id).map(item => ({...item, unit_price: parseFloat(item.unit_price)}))
+                total_amount: parseFloat(order.total_amount as any),
+                items: itemsData.filter(item => item.order_id === order.id).map(item => ({...item, unit_price: parseFloat(item.unit_price as any)}))
             }));
             
             setOrders(combinedOrders);
 
             const lastId = ordersData.length > 0 ? Math.max(...ordersData.map(o => parseInt(o.order_code.split('-')[1]))) : 0;
             setNextOrderCode(`PED-${(lastId + 1).toString().padStart(4, '0')}`);
-        } catch (err: any) {
+        } catch (err) {
             setError("Falha ao carregar dados.");
             console.error(err);
         } finally {
@@ -126,6 +126,16 @@ export function OrdersList() {
     }, [supabase, fetchData]);
 
     const calculateTotal = (items: OrderItem[]) => items.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
+
+    const resetAddForm = () => {
+        setAddSelectedCustomerId("");
+        setAddAddress("");
+        setAddOrderDate(new Date().toISOString().split('T')[0]);
+        setAddPaymentMethod("");
+        setAddOrderItems([]);
+        setAddProductSearch("");
+        setAddFormError(null);
+    };
 
     const handleCreateOrder = async () => {
         if (!addSelectedCustomerId || addOrderItems.length === 0 || !addPaymentMethod) {
@@ -143,7 +153,9 @@ export function OrdersList() {
             }
             const customer = customers.find(c => c.id === addSelectedCustomerId);
             if (!customer) throw new Error("Cliente não encontrado.");
+            
             const total_amount = calculateTotal(addOrderItems);
+            
             const { data: orderData, error: orderError } = await supabase
                 .from('orders').insert({
                     order_code: nextOrderCode,
@@ -154,12 +166,15 @@ export function OrdersList() {
                     payment_method: addPaymentMethod,
                     total_amount: total_amount,
                 }).select().single();
+
             if (orderError) throw orderError;
+
             const itemsToInsert = addOrderItems.map(item => ({
                 order_id: orderData.id, ...item
             }));
             const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
             if (itemsError) throw itemsError;
+
             for (const item of addOrderItems) {
                 const product = products.find(p => p.id === item.product_id);
                 const newQuantity = (product?.quantity || 0) - item.quantity;
@@ -167,8 +182,10 @@ export function OrdersList() {
                 if (stockUpdateError) throw new Error(`Falha ao atualizar estoque para ${item.product_name}.`);
             }
             setIsAddDialogOpen(false);
-        } catch (err: any) {
-            setAddFormError(err.message);
+            resetAddForm();
+        } catch (err) {
+            if (err instanceof Error) setAddFormError(err.message);
+            else setAddFormError("Ocorreu um erro desconhecido.");
         } finally {
             setLoading(false);
         }
@@ -224,8 +241,9 @@ export function OrdersList() {
             await supabase.from('order_items').insert(itemsToInsert);
             
             setIsEditDialogOpen(false);
-        } catch (err: any) {
-            setEditFormError(err.message);
+        } catch (err) {
+            if (err instanceof Error) setEditFormError(err.message);
+            else setEditFormError("Ocorreu um erro desconhecido.");
         } finally {
             setLoading(false);
         }
@@ -248,8 +266,9 @@ export function OrdersList() {
             const { error } = await supabase.from('orders').delete().eq('id', orderId);
             if (error) throw error;
             setIsEditDialogOpen(false);
-        } catch (err: any) {
-            setEditFormError(err.message);
+        } catch (err) {
+            if (err instanceof Error) setEditFormError(err.message);
+            else setEditFormError("Ocorreu um erro desconhecido ao excluir.");
         } finally {
             setLoading(false);
         }
@@ -272,6 +291,48 @@ export function OrdersList() {
         setIsEditDialogOpen(true);
     };
     
+    const handleAddProductAction = (product: Product) => {
+        const existingItem = addOrderItems.find(item => item.product_id === product.id);
+        if (existingItem) {
+            if (existingItem.quantity < product.quantity) {
+                setAddOrderItems(addOrderItems.map(item =>
+                    item.product_id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+                ));
+            } else {
+                 setAddFormError(`Estoque máximo (${product.quantity}) atingido para ${product.name}.`);
+            }
+        } else {
+            if (product.quantity > 0) {
+                setAddOrderItems([...addOrderItems, {
+                    product_id: product.id,
+                    product_name: product.name,
+                    quantity: 1,
+                    unit_price: product.price
+                }]);
+            }
+        }
+        setAddProductSearch("");
+    };
+
+    const handleAddItemQuantityChange = (productId: string, newQuantity: number) => {
+        setAddFormError(null);
+        if (newQuantity <= 0) {
+            setAddOrderItems(addOrderItems.filter(item => item.product_id !== productId));
+        } else {
+             const product = products.find(p => p.id === productId);
+             if (product && newQuantity > product.quantity) {
+                 setAddFormError(`Estoque máximo (${product.quantity}) atingido para ${product.name}.`);
+                 setAddOrderItems(addOrderItems.map(item =>
+                    item.product_id === productId ? { ...item, quantity: product.quantity } : item
+                 ));
+                 return;
+             }
+            setAddOrderItems(addOrderItems.map(item =>
+                item.product_id === productId ? { ...item, quantity: newQuantity } : item
+            ));
+        }
+    };
+
     const handleEditProductAction = (product: Product) => {
         const existingItem = editOrderItems.find(item => item.product_id === product.id);
         if (existingItem) {
@@ -321,6 +382,12 @@ export function OrdersList() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
                         <Input type="search" placeholder="Buscar pedidos..." className="pl-10 w-full bg-[#1C1C1C] text-white border-zinc-600 placeholder:text-zinc-500 rounded-lg" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
+                    <Link href="/orders/customers" passHref>
+                        <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-800 rounded-lg font-semibold py-2 px-4 flex items-center gap-2">
+                            <Users className="h-5 w-5" />
+                            Gerenciar Clientes
+                        </Button>
+                    </Link>
                     <Button className="w-full sm:w-auto bg-white text-black hover:bg-gray-200 rounded-lg font-semibold py-2 px-4 flex items-center gap-2" onClick={() => setIsAddDialogOpen(true)}>
                         <Archive className="h-5 w-5" />
                         Adicionar Pedido
@@ -332,12 +399,12 @@ export function OrdersList() {
             {error && <div className="text-center text-red-500 bg-red-900/20 p-3 rounded-md">{error}</div>}
 
             {!loading && !error && filteredOrders.length > 0 && (
-                <div className="flex items-center px-3 pb-2 mb-2 text-xs font-semibold text-zinc-400 uppercase">
+                <div className="hidden md:flex items-center px-3 pb-2 mb-2 text-xs font-semibold text-zinc-400 uppercase">
                     <div className="flex-1 text-left pr-4">Pedido</div>
                     <div className="flex-1 text-left pr-4">Cliente</div>
                     <div className="flex-1 text-left pr-4">Endereço</div>
                     <div className="flex-1 text-left pr-4">Data</div>
-                    <div className="flex-1 text-left pr-4">Itens</div>
+                    <div className="w-20 text-left pr-4">Itens</div>
                     <div className="flex-1 text-left pr-4">Pagamento</div>
                     <div className="flex-1 text-right pr-4">Total</div>
                     <div className="w-12"></div>
@@ -346,15 +413,15 @@ export function OrdersList() {
             
             <div className="space-y-2">
                 {!loading && filteredOrders.map(order => (
-                    <div key={order.id} className="flex items-center bg-[#1C1C1C] p-3 rounded-lg hover:bg-zinc-800 transition-colors duration-200 cursor-pointer" onClick={() => openEditDialog(order)}>
-                        <div className="flex-1 text-left pr-4 text-white font-medium truncate">{order.order_code}</div>
-                        <div className="flex-1 text-left pr-4 text-zinc-400 truncate">{order.customer_name}</div>
-                        <div className="flex-1 text-left pr-4 text-zinc-400 truncate">{order.address}</div>
-                        <div className="flex-1 text-left pr-4 text-zinc-400 truncate">{new Date(order.order_date + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
-                        <div className="flex-1 text-left pr-4 text-zinc-400 truncate">{order.items.reduce((acc, item) => acc + item.quantity, 0)}</div>
-                        <div className="flex-1 text-left pr-4 text-zinc-400 truncate">{order.payment_method}</div>
-                        <div className="flex-1 text-right pr-4 text-white font-semibold truncate">{order.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
-                        <div className="w-12 text-center">
+                    <div key={order.id} className="grid grid-cols-3 md:flex items-center bg-[#1C1C1C] p-3 rounded-lg hover:bg-zinc-800 transition-colors duration-200 cursor-pointer" onClick={() => openEditDialog(order)}>
+                        <div className="md:flex-1 text-left pr-4 text-white font-medium truncate col-span-2"><span className="md:hidden font-semibold text-zinc-400">Pedido: </span>{order.order_code}</div>
+                        <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Cliente: </span>{order.customer_name}</div>
+                        <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate col-span-3"><span className="md:hidden font-semibold">Endereço: </span>{order.address}</div>
+                        <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Data: </span>{new Date(order.order_date + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
+                        <div className="md:w-20 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Itens: </span>{order.items.reduce((acc, item) => acc + item.quantity, 0)}</div>
+                        <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Pgto: </span>{order.payment_method}</div>
+                        <div className="md:flex-1 text-right pr-4 text-white font-semibold truncate col-span-3 md:col-span-1"><span className="md:hidden font-semibold text-zinc-400">Total: </span>{order.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                        <div className="w-12 text-center hidden md:block">
                             <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDetailsDialog(order); }}>
                                 <Eye className="h-5 w-5 text-zinc-400" />
                             </Button>
@@ -366,8 +433,79 @@ export function OrdersList() {
                 )}
             </div>
             
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                 {/* Modal de Adicionar Pedido aqui */}
+            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => { setIsAddDialogOpen(isOpen); if (!isOpen) resetAddForm(); }}>
+                <DialogContent className="max-w-4xl w-[90%] bg-zinc-900 text-white border-zinc-700">
+                    <DialogHeader>
+                        <DialogTitle>Adicionar Novo Pedido: {nextOrderCode}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[70vh]">
+                        <div className="space-y-4 pr-4 md:border-r border-zinc-700">
+                            <div className="space-y-2">
+                                <Label>Cliente</Label>
+                                <Select value={addSelectedCustomerId} onValueChange={setAddSelectedCustomerId}>
+                                    <SelectTrigger className="bg-zinc-800 border-zinc-700"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
+                                    <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Endereço</Label>
+                                <Input value={addAddress} onChange={e => setAddAddress(e.target.value)} className="bg-zinc-800 border-zinc-700" placeholder="Opcional: endereço de entrega"/>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Data</Label>
+                                <Input type="date" value={addOrderDate} onChange={e => setAddOrderDate(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Forma de Pagamento</Label>
+                                <Select value={addPaymentMethod} onValueChange={setAddPaymentMethod}>
+                                    <SelectTrigger className="bg-zinc-800 border-zinc-700"><SelectValue placeholder="Selecione o pagamento"/></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="PIX">PIX</SelectItem>
+                                        <SelectItem value="Crédito">Crédito</SelectItem>
+                                        <SelectItem value="Débito">Débito</SelectItem>
+                                        <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="pt-4 border-t border-zinc-700 text-right">
+                                <Label>Valor Total</Label>
+                                <p className="text-2xl font-bold">{calculateTotal(addOrderItems).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col">
+                            <Input placeholder="Buscar Produtos para adicionar..." value={addProductSearch} onChange={e => setAddProductSearch(e.target.value)} className="bg-zinc-800 border-zinc-700 mb-4" />
+                            <div className="flex-grow space-y-2 overflow-y-auto">
+                                {addOrderItems.map(item => (
+                                    <div key={item.product_id} className="flex justify-between items-center text-sm p-2 bg-zinc-800 rounded">
+                                        <div>
+                                            <p>{item.product_name}</p>
+                                            <p className="text-xs text-zinc-400">{(item.unit_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Button size="icon" variant="ghost" onClick={() => handleAddItemQuantityChange(item.product_id, item.quantity - 1)}><Minus className="h-4 w-4"/></Button>
+                                            <Input type="number" value={item.quantity} onChange={(e) => handleAddItemQuantityChange(item.product_id, parseInt(e.target.value) || 1)} className="w-12 h-8 text-center bg-zinc-700"/>
+                                            <Button size="icon" variant="ghost" onClick={() => handleAddItemQuantityChange(item.product_id, item.quantity + 1)}><Plus className="h-4 w-4"/></Button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {addProductSearch && products.filter(p => p.name.toLowerCase().includes(addProductSearch.toLowerCase()) && p.quantity > 0).map(p => (
+                                    <div key={p.id} className="flex justify-between items-center p-2 rounded cursor-pointer hover:bg-zinc-800" onClick={() => handleAddProductAction(p)}>
+                                        <span>{p.name} (Estoque: {p.quantity})</span>
+                                        <Plus className="h-4 w-4 text-zinc-400"/>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    {addFormError && <p className="text-sm text-red-500 mt-2">{addFormError}</p>}
+                    <DialogFooter className="mt-4">
+                       <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancelar</Button>
+                       <Button onClick={handleCreateOrder} disabled={loading}>
+                            {loading ? <Loader2 className="animate-spin" /> : "Salvar Pedido"}
+                       </Button>
+                    </DialogFooter>
+                </DialogContent>
             </Dialog>
 
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
