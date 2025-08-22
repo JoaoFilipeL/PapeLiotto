@@ -20,7 +20,7 @@ export default async function BudgetsPage() {
 
   return (
     <DashboardApp>
-        <div>
+        <div className="p-4 sm:p-6 lg:p-8">
             <BudgetsList />
         </div>
     </DashboardApp>

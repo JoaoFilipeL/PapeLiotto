@@ -22,7 +22,7 @@ export function DashboardNavBar({ className }: React.HTMLAttributes<HTMLDivEleme
       {navItems.map((item) => (
         <Link href={item.href} key={item.label} passHref>
           <Button
-            className="flex items-center gap-2 p-3 text-sm font-normal bg-zinc-800 text-white border border-white hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap"
+            className="cursor-pointer flex items-center gap-3 p-3 text-sm font-bold bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700 hover:text-white rounded-md transition-colors whitespace-nowrap"
           >
             <item.icon className="h-4 w-4" />
             <span>{item.label}</span>

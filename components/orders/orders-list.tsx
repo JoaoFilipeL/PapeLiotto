@@ -15,6 +15,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Separator } from "@/components/ui/separator"
 
 interface Product {
     id: string;
@@ -42,11 +44,15 @@ interface Order {
     order_code: string;
     customer_id: string;
     customer_name: string;
+    customer_phone?: string;
     address: string;
     order_date: string;
     payment_method: string;
     total_amount: number;
     items: OrderItem[];
+    notes: string | null;
+    delivery_time: string | null;
+    delivery_fee: number;
 }
 
 export function OrdersList() {
@@ -57,6 +63,7 @@ export function OrdersList() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Add States
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [addFormError, setAddFormError] = useState<string | null>(null);
     const [nextOrderCode, setNextOrderCode] = useState("");
@@ -65,8 +72,13 @@ export function OrdersList() {
     const [addOrderDate, setAddOrderDate] = useState(new Date().toISOString().split('T')[0]);
     const [addPaymentMethod, setAddPaymentMethod] = useState<string>("");
     const [addOrderItems, setAddOrderItems] = useState<OrderItem[]>([]);
-    const [addProductSearch, setAddProductSearch] = useState("");
+    const [addSelectedProductId, setAddSelectedProductId] = useState<string>("");
+    const [addItemQuantity, setAddItemQuantity] = useState(1);
+    const [addNotes, setAddNotes] = useState("");
+    const [addDeliveryTime, setAddDeliveryTime] = useState("12:00");
+    const [addDeliveryFee, setAddDeliveryFee] = useState("0");
 
+    // Edit States
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<Order | null>(null);
     const [editCustomerId, setEditCustomerId] = useState<string>("");
@@ -74,9 +86,14 @@ export function OrdersList() {
     const [editOrderDate, setEditOrderDate] = useState("");
     const [editPaymentMethod, setEditPaymentMethod] = useState("");
     const [editOrderItems, setEditOrderItems] = useState<OrderItem[]>([]);
-    const [editProductSearch, setEditProductSearch] = useState("");
+    const [editSelectedProductId, setEditSelectedProductId] = useState<string>("");
+    const [editItemQuantity, setEditItemQuantity] = useState(1);
+    const [editNotes, setEditNotes] = useState("");
+    const [editDeliveryTime, setEditDeliveryTime] = useState("12:00");
+    const [editDeliveryFee, setEditDeliveryFee] = useState("0");
     const [editFormError, setEditFormError] = useState<string | null>(null);
 
+    // Details States
     const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
     const [selectedOrderDetails, setSelectedOrderDetails] = useState<Order | null>(null);
 
@@ -101,11 +118,15 @@ export function OrdersList() {
             const { data: itemsData, error: itemsError } = await supabase.from('order_items').select('*').in('order_id', orderIds);
             if (itemsError) throw itemsError;
 
-            const combinedOrders: Order[] = ordersData.map(order => ({
-                ...order,
-                total_amount: parseFloat(order.total_amount as any),
-                items: itemsData.filter(item => item.order_id === order.id).map(item => ({...item, unit_price: parseFloat(item.unit_price as any)}))
-            }));
+            const combinedOrders: Order[] = ordersData.map(order => {
+                const customer = customersData.find(c => c.id === order.customer_id);
+                return {
+                    ...order,
+                    customer_phone: customer?.phone,
+                    total_amount: parseFloat(order.total_amount as any),
+                    items: itemsData.filter(item => item.order_id === order.id).map(item => ({...item, unit_price: parseFloat(item.unit_price as any)}))
+                }
+            });
             
             setOrders(combinedOrders);
 
@@ -125,7 +146,22 @@ export function OrdersList() {
         return () => { supabase.removeChannel(channel); };
     }, [supabase, fetchData]);
 
-    const calculateTotal = (items: OrderItem[]) => items.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
+    useEffect(() => {
+        if (addSelectedCustomerId) {
+            const customer = customers.find(c => c.id === addSelectedCustomerId);
+            if (customer) {
+                setAddAddress(customer.address || "");
+            }
+        } else {
+            setAddAddress("");
+        }
+    }, [addSelectedCustomerId, customers]);
+
+    const calculateTotal = (items: OrderItem[], fee: string) => {
+        const itemsTotal = items.reduce((acc, item) => acc + item.unit_price * item.quantity, 0);
+        const deliveryFee = parseFloat(fee) || 0;
+        return itemsTotal + deliveryFee;
+    };
 
     const resetAddForm = () => {
         setAddSelectedCustomerId("");
@@ -133,7 +169,11 @@ export function OrdersList() {
         setAddOrderDate(new Date().toISOString().split('T')[0]);
         setAddPaymentMethod("");
         setAddOrderItems([]);
-        setAddProductSearch("");
+        setAddSelectedProductId("");
+        setAddItemQuantity(1);
+        setAddNotes("");
+        setAddDeliveryTime("12:00");
+        setAddDeliveryFee("0");
         setAddFormError(null);
     };
 
@@ -154,7 +194,7 @@ export function OrdersList() {
             const customer = customers.find(c => c.id === addSelectedCustomerId);
             if (!customer) throw new Error("Cliente não encontrado.");
             
-            const total_amount = calculateTotal(addOrderItems);
+            const total_amount = calculateTotal(addOrderItems, addDeliveryFee);
             
             const { data: orderData, error: orderError } = await supabase
                 .from('orders').insert({
@@ -165,6 +205,9 @@ export function OrdersList() {
                     order_date: addOrderDate,
                     payment_method: addPaymentMethod,
                     total_amount: total_amount,
+                    notes: addNotes,
+                    delivery_time: addDeliveryTime,
+                    delivery_fee: parseFloat(addDeliveryFee) || 0,
                 }).select().single();
 
             if (orderError) throw orderError;
@@ -192,24 +235,24 @@ export function OrdersList() {
     };
 
     const handleUpdateOrder = async () => {
-        if (!editingOrder || !editCustomerId || editOrderItems.length === 0 || !editPaymentMethod) {
-            setEditFormError("Todos os campos devem ser preenchidos.");
+        if (!editingOrder || !editCustomerId || editOrderItems.length === 0) {
+            setEditFormError("Cliente e itens são obrigatórios.");
             return;
         }
         setLoading(true);
         setEditFormError(null);
-
+    
         try {
             const originalItems = editingOrder.items;
             const stockAdjustments = new Map<string, number>();
-
+    
             originalItems.forEach(item => {
                 stockAdjustments.set(item.product_id, (stockAdjustments.get(item.product_id) || 0) + item.quantity);
             });
             editOrderItems.forEach(item => {
                 stockAdjustments.set(item.product_id, (stockAdjustments.get(item.product_id) || 0) - item.quantity);
             });
-
+    
             for (const [productId, quantityChange] of stockAdjustments.entries()) {
                 if (quantityChange !== 0) {
                     const product = products.find(p => p.id === productId);
@@ -221,21 +264,24 @@ export function OrdersList() {
                     }
                 }
             }
-
+    
             const customer = customers.find(c => c.id === editCustomerId);
             if (!customer) throw new Error("Cliente não encontrado.");
-
-            const total_amount = calculateTotal(editOrderItems);
+    
+            const total_amount = calculateTotal(editOrderItems, editDeliveryFee);
             const { error: orderUpdateError } = await supabase.from('orders').update({
                 customer_id: editCustomerId,
                 customer_name: customer.name,
                 address: editAddress,
                 order_date: editOrderDate,
                 payment_method: editPaymentMethod,
-                total_amount
+                total_amount,
+                notes: editNotes,
+                delivery_time: editDeliveryTime,
+                delivery_fee: parseFloat(editDeliveryFee) || 0,
             }).eq('id', editingOrder.id);
             if(orderUpdateError) throw orderUpdateError;
-
+    
             await supabase.from('order_items').delete().eq('order_id', editingOrder.id);
             const itemsToInsert = editOrderItems.map(item => ({ order_id: editingOrder.id, ...item }));
             await supabase.from('order_items').insert(itemsToInsert);
@@ -282,95 +328,65 @@ export function OrdersList() {
     const openEditDialog = (order: Order) => {
         setEditingOrder(order);
         setEditCustomerId(order.customer_id);
-        setEditAddress(order.address);
+        setEditAddress(order.address || "");
         setEditOrderDate(order.order_date);
         setEditPaymentMethod(order.payment_method);
         setEditOrderItems(order.items);
+        setEditNotes(order.notes || "");
+        setEditDeliveryTime(order.delivery_time || "12:00");
+        setEditDeliveryFee(order.delivery_fee?.toString() || "0");
         setEditFormError(null);
-        setEditProductSearch("");
+        setEditSelectedProductId("");
+        setEditItemQuantity(1);
         setIsEditDialogOpen(true);
     };
     
-    const handleAddProductAction = (product: Product) => {
-        const existingItem = addOrderItems.find(item => item.product_id === product.id);
+    const handleAddItemToList = (list: OrderItem[], setList: React.Dispatch<React.SetStateAction<OrderItem[]>>, productId: string, quantity: number, setProductId: (id: string) => void, setQuantity: (q: number) => void, setErrorFunc: (e: string | null) => void) => {
+        setErrorFunc(null);
+        if (!productId) {
+            setErrorFunc("Selecione um produto para adicionar.");
+            return;
+        }
+        const product = products.find(p => p.id === productId);
+        if (!product) {
+            setErrorFunc("Produto não encontrado.");
+            return;
+        }
+
+        const existingItem = list.find(item => item.product_id === product.id);
+        const totalQuantityInOrder = existingItem ? existingItem.quantity : 0;
+
+        if (product.quantity < totalQuantityInOrder + quantity) {
+            setErrorFunc(`Estoque insuficiente para ${product.name}. Disponível: ${product.quantity}`);
+            return;
+        }
+
         if (existingItem) {
-            if (existingItem.quantity < product.quantity) {
-                setAddOrderItems(addOrderItems.map(item =>
-                    item.product_id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                ));
-            } else {
-                 setAddFormError(`Estoque máximo (${product.quantity}) atingido para ${product.name}.`);
-            }
-        } else {
-            if (product.quantity > 0) {
-                setAddOrderItems([...addOrderItems, {
-                    product_id: product.id,
-                    product_name: product.name,
-                    quantity: 1,
-                    unit_price: product.price
-                }]);
-            }
-        }
-        setAddProductSearch("");
-    };
-
-    const handleAddItemQuantityChange = (productId: string, newQuantity: number) => {
-        setAddFormError(null);
-        if (newQuantity <= 0) {
-            setAddOrderItems(addOrderItems.filter(item => item.product_id !== productId));
-        } else {
-             const product = products.find(p => p.id === productId);
-             if (product && newQuantity > product.quantity) {
-                 setAddFormError(`Estoque máximo (${product.quantity}) atingido para ${product.name}.`);
-                 setAddOrderItems(addOrderItems.map(item =>
-                    item.product_id === productId ? { ...item, quantity: product.quantity } : item
-                 ));
-                 return;
-             }
-            setAddOrderItems(addOrderItems.map(item =>
-                item.product_id === productId ? { ...item, quantity: newQuantity } : item
+            setList(list.map(item => 
+                item.product_id === product.id 
+                ? { ...item, quantity: item.quantity + quantity } 
+                : item
             ));
+        } else {
+            setList([...list, {
+                product_id: product.id,
+                product_name: product.name,
+                quantity: quantity,
+                unit_price: product.price
+            }]);
         }
+        setProductId("");
+        setQuantity(1);
     };
 
-    const handleEditProductAction = (product: Product) => {
-        const existingItem = editOrderItems.find(item => item.product_id === product.id);
-        if (existingItem) {
-            if (existingItem.quantity < product.quantity) {
-                setEditOrderItems(editOrderItems.map(item =>
-                    item.product_id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                ));
-            }
-        } else {
-            if (product.quantity > 0) {
-                setEditOrderItems([...editOrderItems, {
-                    product_id: product.id,
-                    product_name: product.name,
-                    quantity: 1,
-                    unit_price: product.price
-                }]);
-            }
-        }
-    };
-
-    const handleEditItemQuantityChange = (productId: string, newQuantity: number) => {
-        if (newQuantity <= 0) {
-            setEditOrderItems(editOrderItems.filter(item => item.product_id !== productId));
-        } else {
-             const product = products.find(p => p.id === productId);
-             if (product && newQuantity > product.quantity) {
-                 setEditFormError(`Estoque máximo (${product.quantity}) atingido.`);
-                 return;
-             }
-            setEditOrderItems(editOrderItems.map(item =>
-                item.product_id === productId ? { ...item, quantity: newQuantity } : item
-            ));
-        }
+    const handleRemoveItemFromList = (list: OrderItem[], setList: React.Dispatch<React.SetStateAction<OrderItem[]>>, productId: string) => {
+        setList(list.filter(item => item.product_id !== productId));
     };
 
     const filteredOrders = orders.filter(o =>
-        o.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.order_code.toLowerCase().includes(searchTerm.toLowerCase())
+        (o.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        o.order_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (o.customer_phone && o.customer_phone.includes(searchTerm))
     );
 
     return (
@@ -383,12 +399,12 @@ export function OrdersList() {
                         <Input type="search" placeholder="Buscar pedidos..." className="pl-10 w-full bg-[#1C1C1C] text-white border-zinc-600 placeholder:text-zinc-500 rounded-lg" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
                     <Link href="/orders/customers" passHref>
-                        <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-800 rounded-lg font-semibold py-2 px-4 flex items-center gap-2">
+                        <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
                             <Users className="h-5 w-5" />
                             Gerenciar Clientes
                         </Button>
                     </Link>
-                    <Button className="w-full sm:w-auto bg-white text-black hover:bg-gray-200 rounded-lg font-semibold py-2 px-4 flex items-center gap-2" onClick={() => setIsAddDialogOpen(true)}>
+                    <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer" onClick={() => setIsAddDialogOpen(true)}>
                         <Archive className="h-5 w-5" />
                         Adicionar Pedido
                     </Button>
@@ -402,8 +418,8 @@ export function OrdersList() {
                 <div className="hidden md:flex items-center px-3 pb-2 mb-2 text-xs font-semibold text-zinc-400 uppercase">
                     <div className="flex-1 text-left pr-4">Pedido</div>
                     <div className="flex-1 text-left pr-4">Cliente</div>
+                    <div className="flex-1 text-left pr-4">Telefone</div>
                     <div className="flex-1 text-left pr-4">Endereço</div>
-                    <div className="flex-1 text-left pr-4">Data</div>
                     <div className="w-20 text-left pr-4">Itens</div>
                     <div className="flex-1 text-left pr-4">Pagamento</div>
                     <div className="flex-1 text-right pr-4">Total</div>
@@ -416,13 +432,13 @@ export function OrdersList() {
                     <div key={order.id} className="grid grid-cols-3 md:flex items-center bg-[#1C1C1C] p-3 rounded-lg hover:bg-zinc-800 transition-colors duration-200 cursor-pointer" onClick={() => openEditDialog(order)}>
                         <div className="md:flex-1 text-left pr-4 text-white font-medium truncate col-span-2"><span className="md:hidden font-semibold text-zinc-400">Pedido: </span>{order.order_code}</div>
                         <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Cliente: </span>{order.customer_name}</div>
+                        <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Telefone: </span>{order.customer_phone || 'N/A'}</div>
                         <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate col-span-3"><span className="md:hidden font-semibold">Endereço: </span>{order.address}</div>
-                        <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Data: </span>{new Date(order.order_date + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
                         <div className="md:w-20 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Itens: </span>{order.items.reduce((acc, item) => acc + item.quantity, 0)}</div>
                         <div className="md:flex-1 text-left pr-4 text-zinc-400 truncate"><span className="md:hidden font-semibold">Pgto: </span>{order.payment_method}</div>
                         <div className="md:flex-1 text-right pr-4 text-white font-semibold truncate col-span-3 md:col-span-1"><span className="md:hidden font-semibold text-zinc-400">Total: </span>{order.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                         <div className="w-12 text-center hidden md:block">
-                            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDetailsDialog(order); }}>
+                            <Button variant="ghost" size="icon" className="cursor-pointer" onClick={(e) => { e.stopPropagation(); openDetailsDialog(order); }}>
                                 <Eye className="h-5 w-5 text-zinc-400" />
                             </Button>
                         </div>
@@ -434,26 +450,40 @@ export function OrdersList() {
             </div>
             
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => { setIsAddDialogOpen(isOpen); if (!isOpen) resetAddForm(); }}>
-                <DialogContent className="max-w-4xl w-[90%] bg-zinc-900 text-white border-zinc-700">
+                <DialogContent className="max-w-3xl w-[90%] bg-zinc-900 text-white border-zinc-700">
                     <DialogHeader>
                         <DialogTitle>Adicionar Novo Pedido: {nextOrderCode}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[70vh]">
-                        <div className="space-y-4 pr-4 md:border-r border-zinc-700">
-                            <div className="space-y-2">
+                    <div className="flex flex-col gap-6 py-4 max-h-[80vh] overflow-y-auto pr-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2 col-span-1 md:col-span-2">
                                 <Label>Cliente</Label>
                                 <Select value={addSelectedCustomerId} onValueChange={setAddSelectedCustomerId}>
                                     <SelectTrigger className="bg-zinc-800 border-zinc-700"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
-                                    <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent>
+                                        {customers.map(c => 
+                                            <SelectItem key={c.id} value={c.id}>
+                                                {c.name} ({c.phone || 'Sem telefone'})
+                                            </SelectItem>
+                                        )}
+                                    </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Endereço</Label>
-                                <Input value={addAddress} onChange={e => setAddAddress(e.target.value)} className="bg-zinc-800 border-zinc-700" placeholder="Opcional: endereço de entrega"/>
+                             <div className="space-y-2">
+                                <Label>Data de Entrega</Label>
+                                <Input type="date" value={addOrderDate} onChange={e => setAddOrderDate(e.target.value)} className="bg-zinc-800 border-zinc-700" />
                             </div>
                             <div className="space-y-2">
-                                <Label>Data</Label>
-                                <Input type="date" value={addOrderDate} onChange={e => setAddOrderDate(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                                <Label>Hora da Entrega</Label>
+                                <Input type="time" value={addDeliveryTime} onChange={e => setAddDeliveryTime(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                             <div className="space-y-2 col-span-1 md:col-span-2">
+                                <Label>Endereço</Label>
+                                <Input value={addAddress} onChange={e => setAddAddress(e.target.value)} className="bg-zinc-800 border-zinc-700" placeholder="Endereço de entrega"/>
+                            </div>
+                             <div className="space-y-2">
+                                <Label>Taxa de Entrega (R$)</Label>
+                                <Input type="number" value={addDeliveryFee} onChange={e => setAddDeliveryFee(e.target.value)} className="bg-zinc-800 border-zinc-700" placeholder="0.00"/>
                             </div>
                             <div className="space-y-2">
                                 <Label>Forma de Pagamento</Label>
@@ -467,41 +497,66 @@ export function OrdersList() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="pt-4 border-t border-zinc-700 text-right">
-                                <Label>Valor Total</Label>
-                                <p className="text-2xl font-bold">{calculateTotal(addOrderItems).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                            </div>
                         </div>
+                        
+                        <Separator className="bg-zinc-700" />
 
-                        <div className="flex flex-col">
-                            <Input placeholder="Buscar Produtos para adicionar..." value={addProductSearch} onChange={e => setAddProductSearch(e.target.value)} className="bg-zinc-800 border-zinc-700 mb-4" />
-                            <div className="flex-grow space-y-2 overflow-y-auto">
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold text-white">Itens do Pedido</h3>
+                            <div className="flex flex-wrap items-stretch gap-2">
+                                <Select value={addSelectedProductId} onValueChange={setAddSelectedProductId}>
+                                    <SelectTrigger className="bg-zinc-800 border-zinc-700 flex-1 min-w-[200px] h-10">
+                                        <SelectValue placeholder="Selecione um produto" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {products.map(p => (
+                                            <SelectItem key={p.id} value={p.id} disabled={p.quantity <= 0}>
+                                                {p.name} - {p.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({p.quantity} em estoque)
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <div className="flex items-center gap-1">
+                                    <Button size="icon" variant="outline" className="h-10 w-10 bg-zinc-800 cursor-pointer" onClick={() => setAddItemQuantity(prev => Math.max(1, prev - 1))}>
+                                        <Minus className="h-4 w-4"/>
+                                    </Button>
+                                    <Input type="number" value={addItemQuantity} onChange={(e) => setAddItemQuantity(parseInt(e.target.value) || 1)} className="w-16 h-10 text-center bg-zinc-800 border-zinc-700"/>
+                                    <Button size="icon" variant="outline" className="h-10 w-10 bg-zinc-800 cursor-pointer" onClick={() => setAddItemQuantity(prev => prev + 1)}>
+                                        <Plus className="h-4 w-4"/>
+                                    </Button>
+                                </div>
+                                <Button onClick={() => handleAddItemToList(addOrderItems, setAddOrderItems, addSelectedProductId, addItemQuantity, setAddSelectedProductId, setAddItemQuantity, setAddFormError)} className="h-10 bg-zinc-700 hover:bg-zinc-600 text-white cursor-pointer">Adicionar</Button>
+                            </div>
+
+                            <div className="flex-grow space-y-2 mt-4">
                                 {addOrderItems.map(item => (
                                     <div key={item.product_id} className="flex justify-between items-center text-sm p-2 bg-zinc-800 rounded">
                                         <div>
-                                            <p>{item.product_name}</p>
-                                            <p className="text-xs text-zinc-400">{(item.unit_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                            <p>{item.quantity}x {item.product_name}</p>
+                                            <p className="text-xs text-zinc-400">{(item.unit_price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <Button size="icon" variant="ghost" onClick={() => handleAddItemQuantityChange(item.product_id, item.quantity - 1)}><Minus className="h-4 w-4"/></Button>
-                                            <Input type="number" value={item.quantity} onChange={(e) => handleAddItemQuantityChange(item.product_id, parseInt(e.target.value) || 1)} className="w-12 h-8 text-center bg-zinc-700"/>
-                                            <Button size="icon" variant="ghost" onClick={() => handleAddItemQuantityChange(item.product_id, item.quantity + 1)}><Plus className="h-4 w-4"/></Button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {addProductSearch && products.filter(p => p.name.toLowerCase().includes(addProductSearch.toLowerCase()) && p.quantity > 0).map(p => (
-                                    <div key={p.id} className="flex justify-between items-center p-2 rounded cursor-pointer hover:bg-zinc-800" onClick={() => handleAddProductAction(p)}>
-                                        <span>{p.name} (Estoque: {p.quantity})</span>
-                                        <Plus className="h-4 w-4 text-zinc-400"/>
+                                        <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-900/20 cursor-pointer" onClick={() => handleRemoveItemFromList(addOrderItems, setAddOrderItems, item.product_id)}>
+                                            <Trash2 className="h-4 w-4"/>
+                                        </Button>
                                     </div>
                                 ))}
                             </div>
                         </div>
+                        
+                        <div className="space-y-2">
+                            <Label>Observações (opcional)</Label>
+                            <Textarea value={addNotes} onChange={(e) => setAddNotes(e.target.value)} className="bg-zinc-800 border-zinc-700" placeholder="Detalhes sobre o pedido..."/>
+                        </div>
+
+                        <div className="pt-4 border-t border-zinc-700 text-right">
+                            <Label>Valor Total</Label>
+                            <p className="text-2xl font-bold">{calculateTotal(addOrderItems, addDeliveryFee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        </div>
                     </div>
                     {addFormError && <p className="text-sm text-red-500 mt-2">{addFormError}</p>}
-                    <DialogFooter className="mt-4">
-                       <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancelar</Button>
-                       <Button onClick={handleCreateOrder} disabled={loading}>
+                    <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                       <Button variant="outline" className="bg-transparent border-zinc-700 hover:bg-zinc-800 hover:text-white cursor-pointer" onClick={() => setIsAddDialogOpen(false)}>Cancelar</Button>
+                       <Button className="bg-white text-black hover:bg-gray-300 cursor-pointer" onClick={handleCreateOrder} disabled={loading}>
                             {loading ? <Loader2 className="animate-spin" /> : "Salvar Pedido"}
                        </Button>
                     </DialogFooter>
@@ -509,26 +564,34 @@ export function OrdersList() {
             </Dialog>
 
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="max-w-4xl w-[90%] bg-zinc-900 text-white border-zinc-700">
+                <DialogContent className="max-w-3xl w-[90%] bg-zinc-900 text-white border-zinc-700">
                     <DialogHeader>
                         <DialogTitle>Editar Pedido: {editingOrder?.order_code}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-2 gap-6 py-4 max-h-[70vh]">
-                        <div className="space-y-4 pr-4 border-r border-zinc-700">
-                            <div className="space-y-2">
+                    <div className="flex flex-col gap-6 py-4 max-h-[80vh] overflow-y-auto pr-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2 col-span-1 md:col-span-2">
                                 <Label>Cliente</Label>
                                 <Select value={editCustomerId} onValueChange={setEditCustomerId}>
                                     <SelectTrigger className="bg-zinc-800 border-zinc-700"><SelectValue /></SelectTrigger>
-                                    <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name} ({c.phone || 'Sem telefone'})</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-2">
+                                <Label>Data de Entrega</Label>
+                                <Input type="date" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                             <div className="space-y-2">
+                                <Label>Hora da Entrega</Label>
+                                <Input type="time" value={editDeliveryTime} onChange={e => setEditDeliveryTime(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                            </div>
+                            <div className="space-y-2 col-span-1 md:col-span-2">
                                 <Label>Endereço</Label>
                                 <Input value={editAddress} onChange={e => setEditAddress(e.target.value)} className="bg-zinc-800 border-zinc-700" />
                             </div>
                             <div className="space-y-2">
-                                <Label>Data</Label>
-                                <Input type="date" value={editOrderDate} onChange={e => setEditOrderDate(e.target.value)} className="bg-zinc-800 border-zinc-700" />
+                                <Label>Taxa de Entrega (R$)</Label>
+                                <Input type="number" value={editDeliveryFee} onChange={e => setEditDeliveryFee(e.target.value)} className="bg-zinc-800 border-zinc-700" />
                             </div>
                             <div className="space-y-2">
                                 <Label>Forma de Pagamento</Label>
@@ -542,46 +605,71 @@ export function OrdersList() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="pt-4 border-t border-zinc-700 text-right">
-                                <Label>Valor Total</Label>
-                                <p className="text-2xl font-bold">{calculateTotal(editOrderItems).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
-                            </div>
                         </div>
 
-                        <div className="flex flex-col">
-                            <Input placeholder="Buscar Produtos..." value={editProductSearch} onChange={e => setEditProductSearch(e.target.value)} className="bg-zinc-800 border-zinc-700 mb-4" />
-                            <div className="flex-grow space-y-2 overflow-y-auto">
+                        <Separator className="bg-zinc-700" />
+                        
+                        <div className="space-y-4">
+                            <h3 className="text-lg font-semibold text-white">Itens do Pedido</h3>
+                            <div className="flex flex-wrap items-stretch gap-2">
+                                <Select value={editSelectedProductId} onValueChange={setEditSelectedProductId}>
+                                    <SelectTrigger className="bg-zinc-800 border-zinc-700 flex-1 min-w-[200px] h-10">
+                                        <SelectValue placeholder="Selecione um produto" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {products.map(p => (
+                                            <SelectItem key={p.id} value={p.id} disabled={p.quantity <= 0}>
+                                                {p.name} - {p.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({p.quantity} em estoque)
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <div className="flex items-center gap-1">
+                                    <Button size="icon" variant="outline" className="h-10 w-10 bg-zinc-800 cursor-pointer" onClick={() => setEditItemQuantity(prev => Math.max(1, prev - 1))}>
+                                        <Minus className="h-4 w-4"/>
+                                    </Button>
+                                    <Input type="number" value={editItemQuantity} onChange={(e) => setEditItemQuantity(parseInt(e.target.value) || 1)} className="w-16 h-10 text-center bg-zinc-800 border-zinc-700"/>
+                                    <Button size="icon" variant="outline" className="h-10 w-10 bg-zinc-800 cursor-pointer" onClick={() => setEditItemQuantity(prev => prev + 1)}>
+                                        <Plus className="h-4 w-4"/>
+                                    </Button>
+                                </div>
+                                <Button onClick={() => handleAddItemToList(editOrderItems, setEditOrderItems, editSelectedProductId, editItemQuantity, setEditSelectedProductId, setEditItemQuantity, setEditFormError)} className="h-10 bg-zinc-700 hover:bg-zinc-600 text-white cursor-pointer">Adicionar</Button>
+                            </div>
+
+                            <div className="flex-grow space-y-2 mt-4">
                                 {editOrderItems.map(item => (
                                     <div key={item.product_id} className="flex justify-between items-center text-sm p-2 bg-zinc-800 rounded">
                                         <div>
-                                            <p>{item.product_name}</p>
-                                            <p className="text-xs text-zinc-400">{(item.unit_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                            <p>{item.quantity}x {item.product_name}</p>
+                                            <p className="text-xs text-zinc-400">{(item.unit_price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <Button size="icon" variant="ghost" onClick={() => handleEditItemQuantityChange(item.product_id, item.quantity - 1)}><Minus className="h-4 w-4"/></Button>
-                                            <Input type="number" value={item.quantity} onChange={(e) => handleEditItemQuantityChange(item.product_id, parseInt(e.target.value) || 1)} className="w-12 h-8 text-center bg-zinc-700"/>
-                                            <Button size="icon" variant="ghost" onClick={() => handleEditItemQuantityChange(item.product_id, item.quantity + 1)}><Plus className="h-4 w-4"/></Button>
-                                        </div>
-                                    </div>
-                                ))}
-                                {editProductSearch && products.filter(p=>p.name.toLowerCase().includes(editProductSearch.toLowerCase())).map(p => (
-                                    <div key={p.id} className="flex justify-between items-center p-2 rounded cursor-pointer hover:bg-zinc-800" onClick={() => handleEditProductAction(p)}>
-                                        <span>{p.name} ({p.quantity})</span>
-                                        <Plus className="h-4 w-4 text-zinc-400"/>
+                                        <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-900/20 cursor-pointer" onClick={() => handleRemoveItemFromList(editOrderItems, setEditOrderItems, item.product_id)}>
+                                            <Trash2 className="h-4 w-4"/>
+                                        </Button>
                                     </div>
                                 ))}
                             </div>
                         </div>
+
+                         <div className="space-y-2">
+                            <Label>Observações (opcional)</Label>
+                            <Textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="bg-zinc-800 border-zinc-700" placeholder="Detalhes sobre o pedido..."/>
+                        </div>
+
+                        <div className="pt-4 border-t border-zinc-700 text-right">
+                            <Label>Valor Total</Label>
+                            <p className="text-2xl font-bold">{calculateTotal(editOrderItems, editDeliveryFee).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        </div>
                     </div>
-                    {editFormError && <p className="text-sm text-red-500">{editFormError}</p>}
-                    <DialogFooter className="mt-4 flex justify-between w-full">
-                        <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400" onClick={() => handleDeleteOrder(editingOrder!.id)} disabled={loading}>
+                    {editFormError && <p className="text-sm text-red-500 mt-2">{editFormError}</p>}
+                    <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between w-full">
+                        <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 cursor-pointer" onClick={() => handleDeleteOrder(editingOrder!.id)} disabled={loading}>
                             <Trash2 className="mr-2 h-4 w-4" />
                             Excluir Pedido
                         </Button>
-                        <div className="flex gap-2">
-                           <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
-                           <Button onClick={handleUpdateOrder} disabled={loading}>
+                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                           <Button variant="outline" className="bg-transparent border-zinc-700 hover:bg-zinc-800 hover:text-white cursor-pointer" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
+                           <Button className="bg-white text-black hover:bg-gray-300 cursor-pointer" onClick={handleUpdateOrder} disabled={loading}>
                                 {loading ? <Loader2 className="animate-spin" /> : "Salvar Alterações"}
                            </Button>
                         </div>
@@ -590,34 +678,70 @@ export function OrdersList() {
             </Dialog>
 
             <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-                <DialogContent className="max-w-lg bg-zinc-900 text-white border-zinc-700">
+                <DialogContent className="max-w-lg bg-[#1C1C1C] text-white border-zinc-700">
                     <DialogHeader>
                         <DialogTitle>Detalhes do Pedido: {selectedOrderDetails?.order_code}</DialogTitle>
+                         <p className="text-sm text-zinc-400">Informações completas sobre o pedido.</p>
                     </DialogHeader>
                     {selectedOrderDetails && (
                         <div className="py-4 space-y-4">
-                            <p><strong>Cliente:</strong> {selectedOrderDetails.customer_name}</p>
-                            <p><strong>Endereço:</strong> {selectedOrderDetails.address}</p>
-                            <p><strong>Data:</strong> {new Date(selectedOrderDetails.order_date + 'T00:00:00').toLocaleDateString('pt-BR')}</p>
-                            <p><strong>Pagamento:</strong> {selectedOrderDetails.payment_method}</p>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                <p><strong>Cliente:</strong></p>
+                                <p>{selectedOrderDetails.customer_name}</p>
+
+                                <p><strong>Telefone:</strong></p>
+                                <p>{selectedOrderDetails.customer_phone || 'N/A'}</p>
+
+                                <p><strong>Endereço de Entrega:</strong></p>
+                                <p>{selectedOrderDetails.address || 'Não informado'}</p>
+                            </div>
+                            
                             <div>
-                                <strong>Itens:</strong>
-                                <div className="mt-2 space-y-1">
+                                <p className="font-bold mb-2">Itens do Pedido:</p>
+                                <div className="space-y-1 text-sm">
                                 {selectedOrderDetails.items.map(item => (
-                                    <div key={item.product_id} className="flex justify-between text-sm">
+                                    <div key={item.product_id} className="flex justify-between items-center">
                                         <span>{item.quantity}x {item.product_name}</span>
-                                        <span>{(item.unit_price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                        <span className="text-zinc-400">{item.unit_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                     </div>
                                 ))}
                                 </div>
                             </div>
-                             <div className="pt-4 border-t border-zinc-700 text-right font-bold text-lg">
-                                Total: {selectedOrderDetails.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                             </div>
+                            
+                            <div className="space-y-2 pt-4 border-t border-zinc-700">
+                                <div className="flex justify-between">
+                                     <p><strong>Taxa de Entrega:</strong></p>
+                                     <p>{selectedOrderDetails.delivery_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                </div>
+                                <div className="flex justify-between font-bold text-lg">
+                                     <p>Total do Pedido:</p>
+                                     <p>{selectedOrderDetails.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                </div>
+                            </div>
+                            
+                             <div className="space-y-2 pt-4 border-t border-zinc-700">
+                                <div className="flex justify-between">
+                                    <p><strong>Data de Entrega:</strong></p>
+                                    <p>{new Date(selectedOrderDetails.order_date + 'T' + selectedOrderDetails.delivery_time).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })} às {selectedOrderDetails.delivery_time}</p>
+                                </div>
+                                 <div className="flex justify-between">
+                                    <p><strong>Pagamento:</strong></p>
+                                    <p>{selectedOrderDetails.payment_method}</p>
+                                </div>
+                                <div className="flex flex-col text-left">
+                                     <p><strong>Observações:</strong></p>
+                                     <p className="text-zinc-400">{selectedOrderDetails.notes || 'Nenhuma observação'}</p>
+                                </div>
+                            </div>
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDetailsDialogOpen(false)}>Fechar</Button>
+                    <DialogFooter className="sm:justify-end">
+                        <Button 
+                            className="bg-white text-black hover:bg-gray-300 w-full sm:w-auto" 
+                            onClick={() => setIsDetailsDialogOpen(false)}
+                        >
+                            Fechar
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
