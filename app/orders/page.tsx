@@ -1,4 +1,4 @@
-import { DashboardApp } from "@/components/dashboard/dashboard-app"
+import { App } from "@/components/header-app/app";
 import { OrdersList } from "@/components/orders/orders-list";
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -19,10 +19,10 @@ export default async function OrdersPage() {
   }
 
   return (
-    <DashboardApp>
-        <div>
+    <App>
+        <div className="p-4 sm:p-6 lg:p-8">
             <OrdersList />
         </div>
-    </DashboardApp>
+    </App>
   )
 }

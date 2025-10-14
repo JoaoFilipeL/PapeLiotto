@@ -9,13 +9,15 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@radix-ui/react-label';
 
 const formSchema = z.object({
   email: z
     .string()
     .min(1, { message: 'E-mail é obrigatório' })
-    .email('E-mail inválido'), 
+    .email('E-mail inválido'),
   password: z
     .string()
     .min(1, { message: 'Senha é obrigatória' })
@@ -35,9 +37,13 @@ export function LoginAccountForm() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isForgotPassOpen, setIsForgotPassOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [isSubmittingForgot, setIsSubmittingForgot] = useState(false);
+  const [forgotPassMessage, setForgotPassMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    setLoginError(null); 
+    setLoginError(null);
     try {
       const supabase = createClientComponentClient();
       const { email, password } = values;
@@ -57,18 +63,40 @@ export function LoginAccountForm() {
           setLoginError('Ocorreu um erro ao fazer login. Tente novamente.');
         }
       } else if (session) {
-        form.reset(); 
-        router.refresh(); 
+        form.reset();
+        router.refresh();
       } else {
         setLoginError('Login falhou. Verifique suas credenciais.');
       }
-    } catch (error: unknown) { 
+    } catch (error: unknown) {
       console.error('Erro inesperado ao fazer login:', error);
       if (error instanceof Error) {
         setLoginError(error.message || 'Ocorreu um erro inesperado. Tente novamente.');
       } else {
         setLoginError('Ocorreu um erro inesperado. Tente novamente.');
       }
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) {
+        setForgotPassMessage({ type: 'error', text: 'Por favor, digite seu e-mail.' });
+        return;
+    }
+    setIsSubmittingForgot(true);
+    setForgotPassMessage(null);
+
+    const supabase = createClientComponentClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/auth/update-password`,
+    });
+
+    setIsSubmittingForgot(false);
+    if (error) {
+        setForgotPassMessage({ type: 'error', text: 'Erro ao enviar o e-mail. Tente novamente.' });
+        console.error("Erro na redefinição de senha:", error);
+    } else {
+        setForgotPassMessage({ type: 'success', text: 'Se existir uma conta com este e-mail, um link para redefinição de senha foi enviado.' });
     }
   };
 
@@ -86,15 +114,15 @@ export function LoginAccountForm() {
           )}
           <FormField
             control={form.control}
-            name='email' 
+            name='email'
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-white text-sm">E-mail</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder='Digite seu e-mail' 
+                    placeholder='Digite seu e-mail'
                     {...field}
-                    type='email' 
+                    type='email'
                     className='flex h-10 w-full rounded-md border border-input bg-zinc-800 text-white px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-zinc-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
                   />
                 </FormControl>
@@ -135,10 +163,57 @@ export function LoginAccountForm() {
               </FormItem>
             )}
           />
-          <a href="#" className="text-sm text-right text-zinc-400 hover:underline">Esqueceu sua senha?</a>
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              setIsForgotPassOpen(true);
+              setForgotPassMessage(null);
+              setForgotEmail('');
+            }}
+            className="text-sm text-right text-zinc-400 hover:underline"
+          >
+            Esqueceu sua senha?
+          </a>
           <Button type='submit' className='w-full mt-4 bg-white text-black hover:bg-gray-200 rounded-md shadow-lg'>Entrar</Button>
         </form>
       </Form>
+
+      <Dialog open={isForgotPassOpen} onOpenChange={setIsForgotPassOpen}>
+        <DialogContent className="bg-zinc-900 text-white border-zinc-700">
+          <DialogHeader>
+            <DialogTitle>Recuperar Senha</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Digite seu e-mail abaixo. Se ele estiver cadastrado, enviaremos um link para você redefinir sua senha.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="forgot-email" className="text-zinc-300">E-mail</Label>
+              <Input
+                id="forgot-email"
+                type="email"
+                placeholder="seu.email@exemplo.com"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                className="bg-zinc-800 border-zinc-700"
+              />
+            </div>
+            {forgotPassMessage && (
+              <p className={`${forgotPassMessage.type === 'success' ? 'text-green-400' : 'text-red-500'} text-sm`}>
+                {forgotPassMessage.text}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsForgotPassOpen(false)} className="bg-transparent border-zinc-700 hover:bg-zinc-800">Cancelar</Button>
+            <Button onClick={handleForgotPassword} disabled={isSubmittingForgot} className="bg-white text-black hover:bg-gray-200">
+              {isSubmittingForgot && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Enviar Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

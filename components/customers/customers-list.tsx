@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Plus, Loader2, Edit, Trash2, User, ArrowLeft } from "lucide-react"
+import { Search, Plus, Loader2, Trash2, User, ArrowLeft } from "lucide-react"
 import {
     Dialog,
     DialogContent,
@@ -166,7 +166,7 @@ export function CustomersList() {
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-5 mb-5 border-b border-zinc-700">
                  <div className="flex items-center gap-4">
                     <Link href="/orders" passHref>
-                        <Button variant="outline" size="icon" className="bg-[#1C1C1C] border-zinc-700 text-white hover:bg-zinc-700">
+                        <Button variant="outline" size="icon" className="bg-[#1C1C1C] border-zinc-700 text-white hover:bg-zinc-700 cursor-pointer">
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
                     </Link>
@@ -243,7 +243,7 @@ export function CustomersList() {
                     {formError && <p className="text-sm text-red-500 mt-2">{formError}</p>}
                     <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between w-full">
                         {isEditing ? (
-                             <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 justify-center sm:justify-start" onClick={handleDeleteCustomer} disabled={loading}>
+                             <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 justify-center sm:justify-start cursor-pointer" onClick={handleDeleteCustomer} disabled={loading}>
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Excluir Cliente
                             </Button>
@@ -251,8 +251,8 @@ export function CustomersList() {
                             <div></div>
                         )}
                         <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                            <Button variant="outline" className="bg-transparent border-zinc-700 hover:bg-zinc-800 hover:text-white" onClick={closeForm}>Cancelar</Button>
-                            <Button className="bg-white text-black hover:bg-gray-300" onClick={handleSaveCustomer} disabled={loading}>
+                            <Button className="cursor-pointer hover:bg-zinc-600" onClick={closeForm}>Cancelar</Button>
+                            <Button className="cursor-pointer hover:bg-zinc-600" onClick={handleSaveCustomer} disabled={loading}>
                                 {loading ? <Loader2 className="animate-spin h-4 w-4" /> : "Salvar"}
                             </Button>
                         </div>

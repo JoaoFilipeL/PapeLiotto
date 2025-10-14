@@ -1,8 +1,8 @@
-import { DashboardApp } from "@/components/dashboard/dashboard-app"
 import { CustomersList } from "@/components/customers/customers-list" 
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect, RedirectType } from 'next/navigation';
+import { App } from "@/components/header-app/app";
 
 export default async function OrdersCustomersPage() {
   let loggedIn = false;
@@ -17,10 +17,10 @@ export default async function OrdersCustomersPage() {
   }
 
   return (
-    <DashboardApp>
+    <App>
       <div className="p-4 sm:p-6 lg:p-8">
         <CustomersList /> 
       </div>
-    </DashboardApp>
+    </App>
   )
 }

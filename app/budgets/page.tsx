@@ -1,5 +1,5 @@
 import { BudgetsList } from "@/components/budgets/budgets-list";
-import { DashboardApp } from "@/components/dashboard/dashboard-app"
+import { App } from "@/components/header-app/app";
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect, RedirectType } from 'next/navigation';
@@ -19,10 +19,10 @@ export default async function BudgetsPage() {
   }
 
   return (
-    <DashboardApp>
+    <App>
         <div className="p-4 sm:p-6 lg:p-8">
             <BudgetsList />
         </div>
-    </DashboardApp>
+    </App>
   )
 }

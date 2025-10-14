@@ -1,10 +1,10 @@
 import { App } from "@/components/header-app/app";
-import { StockTable } from "@/components/stock/stock-table"
+import { HistoryTable } from "@/components/history/history-table";
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect, RedirectType } from 'next/navigation';
 
-export default async function StockPage() {
+export default async function StockHistoryPage() {
   let loggedIn = false;
   try {
     const supabase = createServerComponentClient({ cookies });
@@ -13,7 +13,7 @@ export default async function StockPage() {
     if (session) loggedIn = true;
 
   } catch (error) {
-    console.error('Error in StockPage component:', error);
+    console.error('Error in StockHistoryPage component:', error);
   } finally {
     if (!loggedIn) redirect('/', RedirectType.replace);
   }
@@ -21,7 +21,7 @@ export default async function StockPage() {
   return (
     <App>
       <div className="p-4 sm:p-6 lg:p-8">
-        <StockTable />
+        <HistoryTable />
       </div>
     </App>
   )
