@@ -1,7 +1,7 @@
 'use client'
 
 import { Package } from 'lucide-react';
-import User from './user';
+import User from './user-app/user';
 
 export default function Header() {
     return (

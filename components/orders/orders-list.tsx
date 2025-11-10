@@ -3,10 +3,12 @@ import React, { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Plus, Loader2, Edit, Trash2, Archive, Eye, Minus, Users, MoreVertical, FileDown, Printer, ArrowUpNarrowWide, ArrowDownNarrowWide, Import } from "lucide-react"
+import { Search, Plus, Loader2, Edit, Trash2, Archive, Eye, Minus, Users, MoreVertical, FileDown, Printer, Import, Filter, Check, X } from "lucide-react"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { createClientComponentClient, User } from '@supabase/auth-helpers-nextjs'
 import { Label } from "@/components/ui/label"
@@ -30,16 +32,206 @@ interface Budget {
 }
 
 const getOrderHtml = (order: Order): string => {
-    const itemsHtml = order.items.map(item => `<tr style="border-bottom: 1px solid #eee;"><td style="padding: 8px;">${item.product_name}</td><td style="padding: 8px; text-align: center;">${item.quantity}</td><td style="padding: 8px; text-align: right;">${item.unit_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td><td style="padding: 8px; text-align: right;">${(item.unit_price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td></tr>`).join('');
-    const deliveryFeeHtml = `<tr style="border-top: 2px solid #ddd;"><td colspan="3" style="padding: 8px; text-align: right; font-weight: bold;">Taxa de Entrega:</td><td style="padding: 8px; text-align: right; font-weight: bold;">${order.delivery_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td></tr>`;
-    return `<html><head><title>Pedido ${order.order_code}</title><style>body { font-family: sans-serif; } table { width: 100%; border-collapse: collapse; } .header, .customer-details { margin-bottom: 20px; } .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 1px solid #ccc; } .header h1 { font-size: 24px; font-weight: bold; margin: 0; } .header .details { text-align: right; } .header .details p { margin: 0; font-size: 14px; } .customer-details p { margin: 2px 0; } .total-box { display: flex; justify-content: space-between; font-size: 20px; font-weight: bold; padding: 8px; background-color: #F3F4F6; border-radius: 4px; }</style></head>
-            <body><div style="padding: 32px; width: 210mm; margin: auto;">
-                    <div class="header"><h1>Detalhes do Pedido</h1><div class="details"><p style="font-family: monospace; font-size: 18px; font-weight: bold;">${order.order_code}</p><p>Data do Pedido: ${new Date(order.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</p><p>Data da Entrega: ${new Date(order.order_date + 'T00:00:00').toLocaleDateString('pt-BR')} às ${order.delivery_time}</p></div></div>
-                    <div class="customer-details"><h2 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Cliente:</h2><p><strong>Nome:</strong> ${order.customer_name}</p><p><strong>Telefone:</strong> ${order.customer_phone || 'N/A'}</p><p><strong>Endereço:</strong> ${order.address}</p><p><strong>Pagamento:</strong> ${order.payment_method}</p><p><strong>Atendente:</strong> ${order.employee_name || 'N/A'}</p></div>
-                    <div><h2 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">Itens:</h2><table><thead><tr style="border-bottom: 1px solid #ddd;"><th style="padding: 8px; text-align: left;">Produto</th><th style="padding: 8px; text-align: center;">Qtd.</th><th style="padding: 8px; text-align: right;">Preço Unit.</th><th style="padding: 8px; text-align: right;">Subtotal</th></tr></thead><tbody>${itemsHtml}</tbody><tfoot>${deliveryFeeHtml}</tfoot></table></div>
-                    <div style="display: flex; justify-content: flex-end; margin-top: 32px;"><div style="width: 50%;"><div class="total-box"><span>Total:</span><span>${order.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></div></div></div>
-                    ${order.notes ? `<div style="margin-top: 20px;"><p><strong>Observações:</strong> ${order.notes}</p></div>` : ''}
-            </div></body></html>`;
+    const itemsHtml = order.items.map(item => `
+        <tr style="border-bottom: 1px solid #eee;">
+            <td style="padding: 10px; vertical-align: top;">${item.product_name}</td>
+            <td style="padding: 10px; vertical-align: top; text-align: center;">${item.quantity}</td>
+            <td style="padding: 10px; vertical-align: top; text-align: right;">${item.unit_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+            <td style="padding: 10px; vertical-align: top; text-align: right;">${(item.unit_price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        </tr>
+    `).join('');
+
+    const deliveryFeeHtml = `
+        <tr style="border-top: 2px solid #ccc;">
+            <td colspan="3" style="padding: 10px; text-align: right; font-weight: bold;">Taxa de Entrega:</td>
+            <td style="padding: 10px; text-align: right; font-weight: bold;">${order.delivery_fee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+        </tr>
+    `;
+
+    return `
+        <html>
+        <head>
+            <title>Pedido ${order.order_code}</title>
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 0; background-color: #f8f8f8; }
+                .page {
+                    width: 210mm;
+                    min-height: 297mm;
+                    padding: 20mm;
+                    margin: 10mm auto;
+                    background: white;
+                    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                    border-bottom: 3px solid #333;
+                    padding-bottom: 15px;
+                }
+                .header-left h1 { margin: 0; font-size: 28px; color: #333; }
+                .header-left p { margin: 2px 0; font-size: 12px; color: #555; }
+                .header-right { text-align: right; }
+                .order-box {
+                    border: 2px solid #333;
+                    padding: 10px 15px;
+                    text-align: center;
+                    display: inline-block;
+                }
+                .order-box p { margin: 0; font-size: 12px; text-transform: uppercase; }
+                .order-box h2 { margin: 5px 0 0 0; font-size: 24px; }
+                .customer-details {
+                    border: 1px solid #ccc;
+                    padding: 20px;
+                    margin-top: 25px;
+                    border-radius: 8px;
+                    background-color: #fdfdfd;
+                }
+                .customer-grid {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 15px;
+                    font-size: 14px;
+                }
+                .customer-grid strong { color: #444; display: block; margin-bottom: 2px; }
+                .customer-grid span { color: #666; }
+                .items-section {
+                    flex-grow: 1; 
+                    margin-top: 25px;
+                }
+                .items-section h2 { font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                .items-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .items-table th {
+                    background-color: #f4f4f4;
+                    padding: 12px 10px;
+                    text-align: left;
+                    font-size: 12px;
+                    text-transform: uppercase;
+                    color: #555;
+                }
+                .items-table tfoot td {
+                    padding: 10px;
+                    text-align: right;
+                    font-size: 14px;
+                }
+                .footer {
+                    margin-top: 30px;
+                    padding-top: 20px;
+                    border-top: 2px solid #333;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: flex-start;
+                }
+                .footer-left {
+                    font-size: 12px;
+                    color: #777;
+                }
+                .footer-left p { margin: 5px 0; }
+                .footer-right {
+                    width: 45%;
+                }
+                .total-box {
+                    font-size: 22px;
+                    font-weight: bold;
+                    padding: 15px;
+                    background-color: #f4f4f4;
+                    border-radius: 8px;
+                    text-align: right;
+                }
+                .total-box span {
+                    display: block;
+                    font-size: 14px;
+                    font-weight: normal;
+                    color: #555;
+                    margin-bottom: 5px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="page">
+                <div class="header">
+                    <div class="header-left">
+                        <h1>Atitude Papelaria</h1>
+                        <p>Rua Mato Grosso 1003</p>
+                        <p>(43) 3323-7862</p>
+                        <p>atitudeimportadora@gmail.com</p>
+                    </div>
+                    <div class="header-right">
+                        <div class="order-box">
+                            <p>Pedido Nº</p>
+                            <h2>${order.order_code}</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="customer-details">
+                    <div class="customer-grid">
+                        <div>
+                            <strong>Cliente:</strong>
+                            <span>${order.customer_name}</span>
+                        </div>
+                        <div>
+                            <strong>Telefone:</strong>
+                            <span>${order.customer_phone || 'N/A'}</span>
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <strong>Endereço:</strong>
+                            <span>${order.address}</span>
+                        </div>
+                        <div>
+                            <strong>Data da Entrega:</strong>
+                            <span>${new Date(order.order_date + 'T00:00:00').toLocaleDateString('pt-BR')} às ${order.delivery_time}</span>
+                        </div>
+                        <div>
+                            <strong>Pagamento:</strong>
+                            <span>${order.payment_method}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="items-section">
+                    <h2>Itens do Pedido</h2>
+                    <table class="items-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50%;">Produto</th>
+                                <th style="text-align: center;">Qtd.</th>
+                                <th style="text-align: right;">Preço Unit.</th>
+                                <th style="text-align: right;">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                        <tfoot>
+                            ${deliveryFeeHtml}
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="footer">
+                    <div class="footer-left">
+                        ${order.notes ? `<p><strong>Observações:</strong> ${order.notes}</p>` : ''}
+                        <p>Atendido por: ${order.employee_name || 'N/A'}</p>
+                        <p>Data do Pedido: ${new Date(order.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                    </div>
+                    <div class="footer-right">
+                        <div class="total-box">
+                            <span>Valor Total</span>
+                            ${order.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
 };
 
 export function OrdersList() {
@@ -51,6 +243,7 @@ export function OrdersList() {
     const [error, setError] = useState<string | null>(null);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+    const [statusFilter, setStatusFilter] = useState<string>("todos");
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [addFormError, setAddFormError] = useState<string | null>(null);
     const [nextOrderCode, setNextOrderCode] = useState("");
@@ -337,7 +530,36 @@ export function OrdersList() {
         setProductId(""); setQuantity(1); setProductSearch("");
     };
     const handleRemoveItemFromList = (list: OrderItem[], setList: React.Dispatch<React.SetStateAction<OrderItem[]>>, productId: string) => { setList(list.filter(item => item.product_id !== productId)); };
-    const filteredOrders = orders.filter(o => (o.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) || o.order_code.toLowerCase().includes(searchTerm.toLowerCase())) || (o.customer_phone && o.customer_phone.includes(searchTerm)));
+    
+    const filteredOrders = orders
+        .filter(o => 
+            (o.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             o.order_code.toLowerCase().includes(searchTerm.toLowerCase())) || 
+            (o.customer_phone && o.customer_phone.includes(searchTerm))
+        )
+        .filter(o => 
+            statusFilter === 'todos' ? true : o.status === statusFilter
+        )
+        .sort((a, b) => {
+            const isAInactive = a.status === 'Cancelado' || a.status === 'Entregue';
+            const isBInactive = b.status === 'Cancelado' || b.status === 'Entregue';
+
+            if (isAInactive && !isBInactive) {
+                return 1;
+            }
+            if (!isAInactive && isBInactive) {
+                return -1;
+            }
+            if (isAInactive && isBInactive) {
+                if (a.status === 'Entregue' && b.status === 'Cancelado') {
+                    return -1;
+                }
+                if (a.status === 'Cancelado' && b.status === 'Entregue') {
+                    return 1;
+                }
+            }
+            return 0;
+        });
 
     const getStatusBadgeClass = (status: string): string => {
         const baseClasses = "text-center border text-xs font-semibold rounded-md px-2.5 py-1 transition-colors justify-start cursor-pointer";
@@ -346,6 +568,7 @@ export function OrdersList() {
             case 'Cancelado': return `${baseClasses} bg-red-800/50 text-zinc-300 border-red-700/50`;
             case 'Saiu para Entrega': return `${baseClasses} bg-blue-800/50 text-zinc-300 border-blue-700/50`;
             case 'Em Separação': return `${baseClasses} bg-yellow-800/50 text-zinc-300 border-yellow-700/50`;
+            case 'Pronto': return `${baseClasses} bg-cyan-800/50 text-zinc-300 border-cyan-700/50`;
             default: return `${baseClasses} bg-zinc-800 text-zinc-300 border-zinc-700`;
         }
     };
@@ -358,7 +581,75 @@ export function OrdersList() {
                 <h1 className="text-white text-3xl font-bold">Pedidos</h1>
                 <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
                     <div className="relative flex-1 w-full md:w-64"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" /><Input type="search" placeholder="Buscar pedidos..." className="pl-10 w-full bg-[#1C1C1C] text-white border-zinc-600 placeholder:text-zinc-500 rounded-lg" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-                    <Button variant="outline" size="icon" onClick={() => setSortOrder(current => current === 'asc' ? 'desc' : 'asc')} className="bg-transparent text-white hover:bg-zinc-700 hover:text-white cursor-pointer">{sortOrder === 'desc' ? <ArrowDownNarrowWide className="h-5 w-5" /> : <ArrowUpNarrowWide className="h-5 w-5" />}</Button>
+                    
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
+                                <Filter className="h-4 w-4" />
+                                Filtrar
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 bg-zinc-800 text-white border-zinc-700" align="end">
+                            <div className="grid gap-4">
+                                <div className="space-y-2">
+                                    <h4 className="font-medium leading-none">Ordenar por Data</h4>
+                                    <RadioGroup
+                                        value={sortOrder}
+                                        onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}
+                                        className="grid gap-2"
+                                    >
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="desc" id="r-desc" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-desc">Mais Recentes</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="asc" id="r-asc" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-asc">Mais Antigos</Label>
+                                        </div>
+                                    </RadioGroup>
+                                </div>
+                                <Separator className="bg-zinc-600" />
+                                <div className="space-y-2">
+                                    <h4 className="font-medium leading-none">Filtrar por Status</h4>
+                                    <RadioGroup
+                                        value={statusFilter}
+                                        onValueChange={setStatusFilter}
+                                        className="grid gap-2"
+                                    >
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="todos" id="r-todos" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-todos">Todos os Status</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Pendente" id="r-pendente" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-pendente">Pendente</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Em Separação" id="r-separacao" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-separacao">Em Separação</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Pronto" id="r-pronto" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-pronto">Pronto</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Saiu para Entrega" id="r-entrega" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-entrega">Saiu para Entrega</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Entregue" id="r-entregue" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-entregue">Entregue</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <RadioGroupItem value="Cancelado" id="r-cancelado" className="border-zinc-600 text-white" />
+                                            <Label htmlFor="r-cancelado">Cancelado</Label>
+                                        </div>
+                                    </RadioGroup>
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+
                     <Link href="/orders/customers" passHref><Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer"><Users className="h-5 w-5" />Gerenciar Clientes</Button></Link>
                     <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer" onClick={() => setIsAddDialogOpen(true)}><Archive className="h-5 w-5" />Adicionar Pedido</Button>
                 </div>
@@ -380,32 +671,79 @@ export function OrdersList() {
                 </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[58vh] overflow-y-auto pr-2">
                 {!loading && filteredOrders.map(order => (
-                    <div key={order.id} className="grid grid-cols-1 md:grid-cols-12 items-center gap-x-4 bg-[#1C1C1C] p-3 rounded-lg hover:bg-zinc-800 transition-colors duration-200 cursor-pointer text-sm" onClick={() => openEditDialog(order)}>
+                    <div 
+                        key={order.id} 
+                        className={cn(
+                            "grid grid-cols-1 md:grid-cols-12 items-center gap-x-4 bg-[#1C1C1C] p-3 rounded-lg transition-colors duration-200 text-sm",
+                            (order.status === 'Cancelado' || order.status === 'Entregue')
+                                ? 'opacity-60 cursor-default' 
+                                : 'cursor-pointer hover:bg-zinc-800'
+                        )}
+                        onClick={() => {
+                            if (order.status !== 'Cancelado' && order.status !== 'Entregue') {
+                                openEditDialog(order);
+                            }
+                        }}
+                    >
                         <div className="col-span-1 text-left text-white font-medium truncate">{order.order_code}</div>
                         <div className="md:col-span-2 text-left text-zinc-300 truncate">{order.customer_name}</div>
                         <div className="md:col-span-2 text-left text-zinc-400 truncate">{order.customer_phone || 'N/A'}</div>
                         <div className="md:col-span-1 text-left text-zinc-300 truncate">{order.payment_method}</div>
                         <div className="md:col-span-2 flex justify-center items-center">
-                            <Select value={order.status} onValueChange={(newStatus) => handleStatusChange(order, newStatus)}>
-                                <SelectTrigger className={cn(getStatusBadgeClass(order.status), "w-[150px]")} onClick={(e) => e.stopPropagation()}>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-800 text-white border-zinc-700 cursor-pointer" onClick={(e) => e.stopPropagation()}>
-                                    <SelectItem className="cursor-pointer" value="Pendente">Pendente</SelectItem>
-                                    <SelectItem className="cursor-pointer" value="Em Separação">Em Separação</SelectItem>
-                                    <SelectItem className="cursor-pointer" value="Saiu para Entrega">Saiu para Entrega</SelectItem>
-                                    <SelectItem className="cursor-pointer" value="Entregue">Entregue</SelectItem>
-                                    <SelectItem className="cursor-pointer" value="Cancelado">Cancelado</SelectItem>
-                                </SelectContent>
-                            </Select>
+                            {order.status === 'Cancelado' ? (
+                                <Button
+                                    variant="ghost"
+                                    className="flex items-center text-xs font-semibold text-red-500 hover:bg-red-900/50 hover:text-red-400 h-8 px-3 w-[150px] justify-center"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStatusChange(order, 'Pendente');
+                                    }}
+                                >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Reativar
+                                </Button>
+                            ) : order.status === 'Entregue' ? (
+                                <Button
+                                    variant="ghost"
+                                    className="flex items-center text-xs font-semibold text-green-500 hover:bg-green-900/50 hover:text-green-400 h-8 px-3 w-[150px] justify-center"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStatusChange(order, 'Pendente');
+                                    }}
+                                >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Reativar
+                                </Button>
+                            ) : (
+                                <Select value={order.status} onValueChange={(newStatus) => handleStatusChange(order, newStatus)}>
+                                    <SelectTrigger className={cn(getStatusBadgeClass(order.status), "w-[150px]")} onClick={(e) => e.stopPropagation()}>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-zinc-800 text-white border-zinc-700 cursor-pointer" onClick={(e) => e.stopPropagation()}>
+                                        <SelectItem className="cursor-pointer" value="Pendente">Pendente</SelectItem>
+                                        <SelectItem className="cursor-pointer" value="Em Separação">Em Separação</SelectItem>
+                                        <SelectItem className="cursor-pointer" value="Pronto">Pronto</SelectItem>
+                                        <SelectItem className="cursor-pointer" value="Saiu para Entrega">Saiu para Entrega</SelectItem>
+                                        <SelectItem className="cursor-pointer" value="Entregue">Entregue</SelectItem>
+                                        <SelectItem className="cursor-pointer" value="Cancelado">Cancelado</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}
                         </div>
                         <div className="md:col-span-2 text-left text-zinc-400 truncate">{new Date(order.order_date + 'T00:00:00').toLocaleDateString('pt-BR')} às {order.delivery_time}</div>
                         <div className="md:col-span-1 text-right text-white font-semibold truncate">{order.total_amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                         <div className="md:col-span-1 flex justify-end items-center" onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="cursor-pointer hover:bg-zinc-700" onClick={() => openDetailsDialog(order)}><Eye className="h-5 w-5 text-zinc-400" /></Button>
-                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="cursor-pointer hover:bg-zinc-700"><MoreVertical className="h-5 w-5 text-zinc-400" /></Button></DropdownMenuTrigger>
+                            <Button variant="ghost" size="icon" className="cursor-pointer hover:bg-zinc-700" onClick={() => openDetailsDialog(order)}>
+                                <Eye className="h-5 w-5 text-zinc-400" />
+                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="cursor-pointer hover:bg-zinc-700" disabled={order.status === 'Cancelado' || order.status === 'Entregue'}>
+                                        <MoreVertical className="h-5 w-5 text-zinc-400" />
+                                    </Button>
+                                </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="bg-zinc-800 text-white border-zinc-700">
                                     <DropdownMenuItem className="cursor-pointer focus:bg-zinc-700 focus:text-white" onSelect={() => handleSaveAsPdf(order)}><FileDown className="mr-2 h-4 w-4" />Salvar em PDF</DropdownMenuItem>
                                     <DropdownMenuItem className="cursor-pointer focus:bg-zinc-700 focus:text-white" onSelect={() => handlePrint(order)}><Printer className="mr-2 h-4 w-4" />Imprimir</DropdownMenuItem>

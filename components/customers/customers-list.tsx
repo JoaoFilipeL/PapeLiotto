@@ -228,7 +228,7 @@ export function CustomersList() {
                     </DialogHeader>
                     <div className="py-4 space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="name">Nome*</Label>
+                            <Label htmlFor="name">Nome</Label>
                             <Input id="name" value={formState.name} onChange={handleFormChange} className="bg-zinc-800 border-zinc-700"/>
                         </div>
                         <div className="space-y-2">

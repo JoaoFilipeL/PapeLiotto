@@ -132,6 +132,7 @@ export function StockTable() {
             const { data: stockData, error: stockError } = await supabase
                 .from('stock')
                 .select('*')
+                .eq('is_archived', false)
                 .order('name', { ascending: true });
 
             if (stockError) throw stockError;
@@ -256,27 +257,35 @@ export function StockTable() {
 
 
     const handleDeleteProduct = async (productId: string) => {
-        if (!window.confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) { return; }
+        if (!window.confirm("Tem certeza que deseja 'desabilitar' este produto? Ele sairá da lista de estoque, mas o histórico será mantido.")) { return; }
         
-        const productToDelete = stock.find(p => p.id === productId);
-        if (!productToDelete) return;
+        const productToArchive = stock.find(p => p.id === productId);
+        if (!productToArchive) return;
 
         setLoading(true); setError(null);
         try {
-            const { error } = await supabase.from('stock').delete().eq('id', productId);
+            const { error } = await supabase
+                .from('stock')
+                .update({ is_archived: true }) 
+                .eq('id', productId);
+
             if (error) throw error;
             
             await logStockChange({
                 product_id: productId,
-                product_name: productToDelete.name,
-                action: 'Produto Excluído',
-                quantity_change: -productToDelete.quantity,
-                old_quantity: productToDelete.quantity,
-                new_quantity: 0
+                product_name: productToArchive.name,
+                action: 'Produto Desabilitado',
+                quantity_change: 0, 
+                old_quantity: productToArchive.quantity,
+                new_quantity: productToArchive.quantity
             });
             
             setError(null); setIsEditProductDialogOpen(false);
-        } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+        } catch (err: any) { 
+            setError(err.message); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const openEditProductDialog = (product: StockItem) => {
@@ -361,8 +370,8 @@ export function StockTable() {
         <div className="bg-[#2D2D2D] p-6 rounded-xl border border-zinc-700 font-sans">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-5 mb-5 border-b border-zinc-700">
                 <h1 className="text-white text-3xl font-bold">Estoque</h1>
-                <div className="flex flex-col sm:flex-row items-center gap-10 w-full md:w-auto">
-
+                
+                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
                     <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
                         <DialogTrigger asChild>
                             <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
@@ -370,7 +379,7 @@ export function StockTable() {
                                 Consultar produtos
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-6xl w-[90%] bg-zinc-900 text-white border-zinc-700">
+                        <DialogContent className="w-full sm:max-w-5xl bg-zinc-900 text-white border-zinc-700">
                             <DialogHeader>
                                 <DialogTitle>Consultar produtos</DialogTitle>
                             </DialogHeader>
@@ -384,19 +393,22 @@ export function StockTable() {
                                     onChange={(e) => setModalSearchTerm(e.target.value)}
                                 />
                             </div>
-                            <div className="max-h-[60vh] overflow-y-auto pr-2 space-y-2 mt-4">
+                            <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-2 mt-4">
                                 {filteredModalStock.length > 0 ? (
                                     filteredModalStock.map(item => (
-                                        <div key={item.id} className="grid grid-cols-3 items-center gap-4 p-3 bg-zinc-800 rounded-lg">
-                                            <div className="col-span-1">
-                                                <p className="font-bold text-white truncate">{item.name}</p>
-                                                <p className="text-xs text-zinc-400 font-mono">{item.barcode}</p>
+                                        <div key={item.id} className="grid grid-cols-5 items-center gap-4 p-4 bg-zinc-800 rounded-lg">
+                                            <div className="col-span-2">
+                                                <p className="font-bold text-white truncate text-base">{item.name}</p>
+                                                <p className="text-sm text-zinc-400 font-mono">{item.barcode}</p>
                                             </div>
-                                            <div className="col-span-1 text-center font-semibold text-zinc-300">
+                                            <div className="col-span-1 text-center text-sm text-zinc-400 truncate">
+                                                {item.supplier}
+                                            </div>
+                                            <div className="col-span-1 text-right font-semibold text-zinc-300 text-base">
                                                 {item.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                             </div>
                                             <div className="col-span-1 flex justify-end">
-                                                 <Badge className={`${statusColors[item.status]} text-xs font-semibold`}>
+                                                 <Badge className={`${statusColors[item.status]} text-sm font-semibold`}>
                                                     {item.quantity} {item.unit}.
                                                 </Badge>
                                             </div>
@@ -412,12 +424,6 @@ export function StockTable() {
                         </DialogContent>
                     </Dialog>
 
-                    <Link href="/stock/history" passHref>
-                        <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
-                            <History className="h-5 w-5" />
-                            Histórico
-                        </Button>
-                    </Link>
                     {userProfile?.role === 'Gerente' && (
                         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                             <DialogTrigger asChild>
@@ -453,7 +459,7 @@ export function StockTable() {
                 </div>
             )}
             
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-2">
                 {!loading && sortedStock.length > 0 && (
                     sortedStock.map((item) => (
                         <div
@@ -492,13 +498,22 @@ export function StockTable() {
                 )}
             </div>
             
+            <div className="flex justify-end mt-6">
+                <Link href="/stock/history" passHref>
+                    <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
+                        <History className="h-5 w-5" />
+                        Histórico
+                    </Button>
+                </Link>
+            </div>
+
             <Dialog open={isEditProductDialogOpen} onOpenChange={setIsEditProductDialogOpen}>
                 <DialogContent className="max-w-md w-[90%] bg-zinc-900 text-white border-zinc-700">
                     <DialogHeader><DialogTitle>Editar Produto: {editingProduct?.name}</DialogTitle><DialogDescription className="text-zinc-400">Edite os detalhes do produto.</DialogDescription></DialogHeader>
                     {renderDialogContent(true)}
                     <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between w-full">
                         {userProfile?.role === 'Gerente' && (
-                            <Button variant="ghost" onClick={() => handleDeleteProduct(editingProduct?.id || '')} className="w-full sm:w-auto justify-center text-red-600 hover:bg-red-900/20 hover:text-red-500 cursor-pointer" disabled={loading}><Trash2 className="mr-2 h-4 w-4" />Excluir Produto</Button>
+                            <Button variant="ghost" onClick={() => handleDeleteProduct(editingProduct?.id || '')} className="w-full sm:w-auto justify-center text-red-600 hover:bg-red-900/20 hover:text-red-500 cursor-pointer" disabled={loading}><Trash2 className="mr-2 h-4 w-4" />Desabilitar Produto</Button>
                         )}
                         <div className="flex gap-2 w-full sm:w-auto">
                             <Button variant="ghost" className="cursor-pointer hover:bg-zinc-700" onClick={() => setIsEditProductDialogOpen(false)}>Cancelar</Button>
