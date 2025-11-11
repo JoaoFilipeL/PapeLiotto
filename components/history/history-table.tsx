@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from "next/link";
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Input } from "@/components/ui/input"
@@ -45,22 +45,48 @@ export function HistoryTable() {
 
     useEffect(() => {
         fetchHistory();
-    }, [fetchHistory]);
 
-    const filteredLogs = logs.filter(log =>
-        (log.product_name && log.product_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (log.user_email && log.user_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        log.action.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+        const historyChannel = supabase
+            .channel('stock_history_changes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stock_history' }, 
+                (payload) => {
+                    setLogs((currentLogs) => [payload.new as StockHistoryLog, ...currentLogs]);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(historyChannel);
+        };
+    }, [supabase, fetchHistory]);
+
+    const filteredLogs = useMemo(() => {
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return logs.filter(log =>
+            (log.product_name && log.product_name.toLowerCase().includes(lowerSearchTerm)) ||
+            (log.user_email && log.user_email.toLowerCase().includes(lowerSearchTerm)) ||
+            log.action.toLowerCase().includes(lowerSearchTerm)
+        );
+    }, [logs, searchTerm]);
 
     const formatChange = (log: StockHistoryLog) => {
         if (log.details) {
             return <span className="text-zinc-300">{log.details}</span>;
         }
+        
         if (log.quantity_change !== null && log.quantity_change !== 0) {
-            const sign = log.quantity_change > 0 ? '+' : '';
-            const color = log.quantity_change > 0 ? 'text-green-400' : 'text-red-400';
-            return <span className={`${color} font-mono`}>{sign}{log.quantity_change}</span>;
+            const { quantity_change, old_quantity, new_quantity } = log;
+            const sign = quantity_change > 0 ? '+' : '';
+            const color = quantity_change > 0 ? 'text-green-400' : 'text-red-400';
+            
+            return (
+                <div className="flex items-center gap-2">
+                    <span className={`${color} font-mono font-bold`}>{sign}{quantity_change}</span>
+                    <span className="text-zinc-500 font-mono hidden lg:inline">
+                        ({old_quantity} &rarr; {new_quantity})
+                    </span>
+                </div>
+            );
         }
         return <span className="text-zinc-500">N/A</span>;
     }
@@ -101,11 +127,11 @@ export function HistoryTable() {
                 </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-2">
                 {!loading && filteredLogs.map((log) => (
                     <div
                         key={log.id}
-                        className="grid grid-cols-12 items-center gap-x-6 bg-[#1C1C1C] p-3 rounded-lg text-sm"
+                        className="grid grid-cols-1 md:grid-cols-12 items-center gap-x-6 bg-[#1C1C1C] p-3 rounded-lg text-sm"
                     >
                         <div className="col-span-2 text-zinc-400">
                             {new Date(log.created_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' })}
