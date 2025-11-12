@@ -156,7 +156,7 @@ export function BudgetFormDialog({ isOpen, onOpenChange, customers, products, cu
 
     const handleDeleteBudget = async () => {
         if (!isEditing || !editingBudget) return;
-        if (!window.confirm("Tem certeza que deseja excluir este orçamento? Ele poderá ser recuperado no futuro.")) return;
+        if (!window.confirm("Tem certeza que deseja desabilitar este orçamento? Ele poderá ser recuperado no futuro.")) return;
         setIsDeleting(true);
         try {
             await supabase
@@ -164,12 +164,12 @@ export function BudgetFormDialog({ isOpen, onOpenChange, customers, products, cu
                 .update({ deleted_at: new Date().toISOString() })
                 .eq('id', editingBudget.id);
 
-            toast.success("Orçamento excluído com sucesso.");
+            toast.success("Orçamento desabilitado com sucesso.");
             onOpenChange(false);
             onBudgetSaved();
         } catch (err) {
-            setFormError("Erro ao excluir o orçamento.");
-            toast.error("Erro ao excluir o orçamento.");
+            setFormError("Erro ao desabilitar o orçamento.");
+            toast.error("Erro ao desabilitar o orçamento.");
         } finally {
             setIsDeleting(false);
         }
@@ -248,7 +248,7 @@ export function BudgetFormDialog({ isOpen, onOpenChange, customers, products, cu
                 <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between w-full">
                     {isEditing ? (
                         <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 justify-start sm:justify-center cursor-pointer" onClick={handleDeleteBudget} disabled={isLoading || isDeleting}>
-                            {isDeleting ? <Loader2 className="animate-spin" /> : <><Trash2 className="mr-2 h-4 w-4" />Excluir Orçamento</>}
+                            {isDeleting ? <Loader2 className="animate-spin" /> : <><Trash2 className="mr-2 h-4 w-4" />Desabilitar Orçamento</>}
                         </Button>
                     ) : (
                         <div></div>
