@@ -4,30 +4,11 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Plus, Loader2, Trash2, User, ArrowLeft } from "lucide-react"
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import { Search, Plus, Loader2, User, ArrowLeft } from "lucide-react"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-
-interface Customer {
-    id: string;
-    name: string;
-    phone: string | null;
-    address: string | null;
-}
-
-const initialFormState = {
-    name: "",
-    phone: "",
-    address: "",
-};
+import { Customer } from "../orders/types/orders" 
+import { CustomerFormModal } from "./customer-form-modal"
+import { toast } from "sonner"
 
 export function CustomersList() {
     const [customers, setCustomers] = useState<Customer[]>([]);
@@ -37,9 +18,7 @@ export function CustomersList() {
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [formState, setFormState] = useState(initialFormState);
-    const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
-    const [formError, setFormError] = useState<string | null>(null);
+    const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
     const supabase = createClientComponentClient();
 
@@ -54,6 +33,7 @@ export function CustomersList() {
             setCustomers(data);
         } catch (err) {
             setError("Falha ao carregar clientes.");
+            toast.error("Falha ao carregar clientes.");
             console.error(err);
         } finally {
             setLoading(false);
@@ -66,94 +46,16 @@ export function CustomersList() {
         return () => { supabase.removeChannel(channel); };
     }, [supabase, fetchCustomers]);
 
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { id, value } = e.target;
-        setFormState(prev => ({ ...prev, [id]: value }));
-    };
-
-    const handleSaveCustomer = async () => {
-        if (!formState.name) {
-            setFormError("O nome do cliente é obrigatório.");
-            return;
-        }
-        setLoading(true);
-        setFormError(null);
-
-        try {
-            if (isEditing && editingCustomerId) {
-                const { error } = await supabase
-                    .from('customers')
-                    .update({
-                        name: formState.name,
-                        phone: formState.phone || null,
-                        address: formState.address || null
-                    })
-                    .eq('id', editingCustomerId);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase
-                    .from('customers')
-                    .insert({
-                        name: formState.name,
-                        phone: formState.phone || null,
-                        address: formState.address || null
-                    });
-                if (error) throw error;
-            }
-            closeForm();
-        } catch (err) {
-            if (err instanceof Error) setFormError(`Erro ao salvar cliente: ${err.message}`);
-            else setFormError("Ocorreu um erro desconhecido ao salvar o cliente.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleDeleteCustomer = async () => {
-        if (!editingCustomerId) return;
-        if (window.confirm("Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.")) {
-            setLoading(true);
-            try {
-                const { error } = await supabase.from('customers').delete().eq('id', editingCustomerId);
-                if (error) throw error;
-                closeForm();
-            } catch (err) {
-                 if (err instanceof Error) setFormError(`Erro ao excluir cliente: ${err.message}`);
-                 else setFormError("Ocorreu um erro desconhecido ao excluir o cliente.");
-            } finally {
-                setLoading(false);
-            }
-        }
-    };
-    
     const openAddForm = () => {
         setIsEditing(false);
-        setFormState(initialFormState);
-        setEditingCustomerId(null);
-        setFormError(null);
+        setEditingCustomer(null);
         setIsFormOpen(true);
     };
 
     const openEditForm = (customer: Customer) => {
         setIsEditing(true);
-        setFormState({
-            name: customer.name,
-            phone: customer.phone || "",
-            address: customer.address || ""
-        });
-        setEditingCustomerId(customer.id);
-        setFormError(null);
+        setEditingCustomer(customer);
         setIsFormOpen(true);
-    };
-
-    const closeForm = () => {
-        setIsFormOpen(false);
-        setTimeout(() => {
-            setFormState(initialFormState);
-            setEditingCustomerId(null);
-            setIsEditing(false);
-            setFormError(null);
-        }, 300);
     };
 
     const filteredCustomers = customers.filter(c =>
@@ -198,7 +100,7 @@ export function CustomersList() {
                 </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-2">
                 {loading && <div className="text-center text-zinc-400 py-8"><Loader2 className="h-8 w-8 animate-spin mx-auto"/></div>}
                 {error && <p className="text-center text-red-500 bg-red-900/20 p-3 rounded-md">{error}</p>}
                 
@@ -218,47 +120,12 @@ export function CustomersList() {
                 )}
             </div>
 
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent className="max-w-md w-[90%] bg-zinc-900 text-white border-zinc-700">
-                    <DialogHeader>
-                        <DialogTitle>{isEditing ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
-                        <DialogDescription className="text-zinc-400">
-                            {isEditing ? "Altere os dados do cliente abaixo." : "Preencha os dados do novo cliente."}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Nome</Label>
-                            <Input id="name" value={formState.name} onChange={handleFormChange} className="bg-zinc-800 border-zinc-700"/>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="phone">Telefone</Label>
-                            <Input id="phone" value={formState.phone ?? ''} onChange={handleFormChange} className="bg-zinc-800 border-zinc-700"/>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="address">Endereço</Label>
-                            <Input id="address" value={formState.address ?? ''} onChange={handleFormChange} className="bg-zinc-800 border-zinc-700"/>
-                        </div>
-                    </div>
-                    {formError && <p className="text-sm text-red-500 mt-2">{formError}</p>}
-                    <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between w-full">
-                        {isEditing ? (
-                             <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 justify-center sm:justify-start cursor-pointer" onClick={handleDeleteCustomer} disabled={loading}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir Cliente
-                            </Button>
-                        ) : (
-                            <div></div>
-                        )}
-                        <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                            <Button className="cursor-pointer hover:bg-zinc-600" onClick={closeForm}>Cancelar</Button>
-                            <Button className="cursor-pointer hover:bg-zinc-600" onClick={handleSaveCustomer} disabled={loading}>
-                                {loading ? <Loader2 className="animate-spin h-4 w-4" /> : "Salvar"}
-                            </Button>
-                        </div>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <CustomerFormModal
+                isOpen={isFormOpen}
+                onOpenChange={setIsFormOpen}
+                isEditing={isEditing}
+                customer={editingCustomer}
+            />
         </div>
     );
 }

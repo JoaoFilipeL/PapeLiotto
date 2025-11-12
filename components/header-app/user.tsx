@@ -156,7 +156,7 @@ export default function User() {
                 const { data: { publicUrl } } = supabase.storage
                     .from('avatars')
                     .getPublicUrl(filePath);
-                
+
                 userProfile.avatar_url = `${publicUrl}?t=${new Date().getTime()}`;
             }
 
@@ -189,7 +189,7 @@ export default function User() {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
 
-            if (file.size > 5 * 1024 * 1024) { // 5MB
+            if (file.size > 5 * 1024 * 1024) {
                 toast.error("Arquivo muito grande. Máximo de 5MB.");
                 return;
             }
@@ -215,16 +215,16 @@ export default function User() {
                 const fileNameWithQuery = urlParts[urlParts.length - 1];
                 const fileName = fileNameWithQuery.split('?')[0];
                 if (fileName) {
-                     await supabase.storage.from('avatars').remove([fileName]);
+                    await supabase.storage.from('avatars').remove([fileName]);
                 }
             }
 
             await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id);
             setUserProfile({ ...userProfile, avatar_url: null });
-            
+
             setImageFile(null);
             setImagePreview(null);
-            
+
             toast.success("Foto removida.");
         } catch (err: any) {
             console.error("Erro ao remover avatar:", err);

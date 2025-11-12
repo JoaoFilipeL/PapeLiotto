@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -136,11 +136,15 @@ export function OrdersTable() {
         return formatDate(order.order_date);
     };
 
-    const filteredOrders = orders.filter(order =>
-        order.order_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (order.customers && order.customers[0]?.phone && order.customers[0].phone.includes(searchTerm))
-    );
+    const filteredOrders = useMemo(() => {
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return orders.filter(order =>
+            order.order_code.toLowerCase().includes(lowerSearchTerm) ||
+            order.customer_name.toLowerCase().includes(lowerSearchTerm) ||
+            (order.customers && order.customers[0]?.phone && order.customers[0].phone.includes(searchTerm))
+        );
+    }, [orders, searchTerm]);
+
 
     const viewTitles = {
         today: "Pedidos Hoje",

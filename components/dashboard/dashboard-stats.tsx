@@ -22,7 +22,6 @@ export function DashboardStats() {
             const today = new Date();
             const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
             const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).toISOString();
-
             const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
 
             const { data: ordersData, error: ordersError } = await supabase

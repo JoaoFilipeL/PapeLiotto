@@ -1,9 +1,11 @@
 import { DashboardStats } from '@/components/dashboard/dashboard-stats';
 import { App } from '@/components/header-app/app';
-import { OrdersTable } from '@/components/orders/orders-table';
+import { OrdersTable } from '@/components/dashboard/orders-table/orders-table';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { redirect, RedirectType } from 'next/navigation';
+
+export const dynamic = 'force-dynamic'
 
 export default async function Dashboard() {
   let loggedIn = false;

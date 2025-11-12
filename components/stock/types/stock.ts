@@ -12,6 +12,13 @@ export interface StockItem {
     status: "ok" | "baixo" | "crítico"
 }
 
+export interface Product {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number; 
+}
+
 export interface UserProfile {
     role: string | null;
 }

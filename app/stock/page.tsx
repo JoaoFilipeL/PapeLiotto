@@ -9,8 +9,7 @@ export const dynamic = 'force-dynamic'
 export default async function StockPage() {
   let loggedIn = false;
   try {
-    const cookieStore = cookies()
-    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+    const supabase = createServerComponentClient({ cookies }); 
     const { data: { session } } = await supabase.auth.getSession();
 
     if (session) loggedIn = true;

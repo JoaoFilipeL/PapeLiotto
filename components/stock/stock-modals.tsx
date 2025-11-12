@@ -101,8 +101,8 @@ export function AddStockProductDialog({ logStockChange, currentUser }: AddStockP
                     isEdit={false}
                 />
                 <DialogFooter className="mt-4">
-                    <Button variant="ghost" className="cursor-pointer hover:bg-zinc-700" onClick={() => setIsOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                    <Button className="cursor-pointer hover:bg-zinc-700" onClick={addNewItem} disabled={isSubmitting}>
+                    <Button variant="ghost" className="cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={() => setIsOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                    <Button variant="ghost" className="cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={addNewItem} disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Adicionar"}
                     </Button>
                 </DialogFooter>
@@ -260,8 +260,8 @@ export function EditStockProductDialog({ isOpen, onOpenChange, product, logStock
                         </Button>
                     )}
                     <div className="flex gap-2 w-full sm:w-auto">
-                        <Button variant="ghost" className="cursor-pointer hover:bg-zinc-700" onClick={() => onOpenChange(false)} disabled={isSubmitting || isDeleting}>Cancelar</Button>
-                        <Button className="cursor-pointer hover:bg-zinc-700" onClick={updateProduct} disabled={isSubmitting || isDeleting}>
+                        <Button variant="ghost" className="cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={() => onOpenChange(false)} disabled={isSubmitting || isDeleting}>Cancelar</Button>
+                        <Button variant="ghost" className="cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={updateProduct} disabled={isSubmitting || isDeleting}>
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Salvar Alterações"}
                         </Button>
                     </div>
@@ -361,8 +361,8 @@ export function StockQuantityDialog({ isOpen, onOpenChange, productInfo, logStoc
                     />
                 </div>
                 <DialogFooter>
-                    <Button variant="ghost" onClick={() => onOpenChange(false)} className="cursor-pointer hover:bg-zinc-700" disabled={isSubmitting}>Cancelar</Button>
-                    <Button onClick={handleConfirm} className="cursor-pointer hover:bg-zinc-700" disabled={isSubmitting}>
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} className="cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" disabled={isSubmitting}>Cancelar</Button>
+                    <Button variant="ghost" onClick={handleConfirm} className="cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" disabled={isSubmitting}>
                          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Confirmar"}
                     </Button>
                 </DialogFooter>

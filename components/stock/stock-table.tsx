@@ -204,8 +204,13 @@ export function StockTable() {
                                     <p className="text-center text-zinc-500 py-8">Nenhum produto encontrado.</p>
                                 )}
                             </div>
-                            <DialogFooter className="mt-4">
-                                <Button className="cursor-pointer hover:bg-zinc-700" onClick={() => setIsSearchDialogOpen(false)}>Fechar</Button>
+                            <DialogFooter className="mt-4 flex flex-row items-center">
+                                <div className="text-sm text-zinc-400 mr-auto">
+                                    {filteredModalStock.length} {filteredModalStock.length === 1 ? 'produto encontrado' : 'itens'}
+                                </div>
+                                <Button variant="ghost" className="cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={() => setIsSearchDialogOpen(false)}>
+                                    Fechar
+                                </Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>

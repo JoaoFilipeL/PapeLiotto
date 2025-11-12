@@ -8,7 +8,7 @@ import { Package } from 'lucide-react';
 export default async function Home() {
   let loggedIn = false;
   try {
-    const supabase = createServerComponentClient({ cookies });
+    const supabase = createServerComponentClient({ cookies }); 
     const { data: { session } } = await supabase.auth.getSession();
 
     if (session) loggedIn = true;
