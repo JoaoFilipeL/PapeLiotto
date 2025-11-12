@@ -306,19 +306,23 @@ export function EditOrderDialog({ isOpen, onOpenChange, editingOrder, customers,
 
     const handleDeleteOrder = async () => {
         if (!editingOrder) return;
-        if (!window.confirm("Tem certeza que deseja excluir este pedido? Esta ação não pode ser desfeita e o estoque NÃO será revertido.")) return;
+        if (!window.confirm("Tem certeza que deseja desabilitar este pedido? O estoque dos itens NÃO será revertido.")) return;
         setLoading(true);
         try {
-            await supabase.from('order_items').delete().eq('order_id', editingOrder.id);
-            await supabase.from('orders').delete().eq('id', editingOrder.id);
+            const { error } = await supabase
+                .from('orders')
+                .update({ is_archived: true })
+                .eq('id', editingOrder.id);
+
+            if (error) throw error;
             
-            toast.success("Pedido excluído permanentemente!");
+            toast.success("Pedido desabilitado com sucesso!");
             onOpenChange(false);
             onOrderDeleted();
         } catch (err) {
             if (err instanceof Error) setFormError(err.message);
-            else setFormError("Ocorreu um erro desconhecido ao excluir.");
-            toast.error("Erro ao excluir pedido.");
+            else setFormError("Ocorreu um erro desconhecido ao desabilitar.");
+            toast.error("Erro ao desabilitar pedido.");
         } finally {
             setLoading(false);
         }
@@ -367,7 +371,7 @@ export function EditOrderDialog({ isOpen, onOpenChange, editingOrder, customers,
                 </div>
                 {formError && <p className="text-sm text-red-500 mt-2">{formError}</p>}
                 <DialogFooter className="mt-4 flex flex-col-reverse sm:flex-row sm:justify-between w-full">
-                    <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 justify-start sm:justify-center cursor-pointer" onClick={handleDeleteOrder} disabled={loading}><Trash2 className="mr-2 h-4 w-4" />Excluir Pedido</Button>
+                    <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 justify-start sm:justify-center cursor-pointer" onClick={handleDeleteOrder} disabled={loading}><Trash2 className="mr-2 h-4 w-4" />Desabilitar Pedido</Button>
                     <div>
                         <Button variant="ghost" className="mr-2 cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={() => onOpenChange(false)} >Cancelar</Button>
                         <Button variant="ghost" className="mr-2 cursor-pointer text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800" onClick={handleUpdateOrder} disabled={loading}>{loading ? <Loader2 className="animate-spin" /> : "Salvar Alterações"}</Button>

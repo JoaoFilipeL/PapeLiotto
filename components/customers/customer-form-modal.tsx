@@ -99,17 +99,21 @@ export function CustomerFormModal({ isOpen, onOpenChange, isEditing, customer }:
 
     const handleDeleteCustomer = async () => {
         if (!isEditing || !customer) return;
-        if (window.confirm("Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.")) {
+        if (window.confirm("Tem certeza que deseja desabilitar este cliente?")) {
             setIsLoading(true);
             try {
-                const { error } = await supabase.from('customers').delete().eq('id', customer.id);
+                const { error } = await supabase
+                    .from('customers')
+                    .update({ is_archived: true })
+                    .eq('id', customer.id);
+                    
                 if (error) throw error;
-                toast.success("Cliente excluído com sucesso!");
+                toast.success("Cliente desabilitado com sucesso!");
                 onOpenChange(false);
             } catch (err) {
                  const errorMsg = (err instanceof Error) ? err.message : "Ocorreu um erro desconhecido.";
-                 setFormError(`Erro ao excluir cliente: ${errorMsg}`);
-                 toast.error("Erro ao excluir cliente.");
+                 setFormError(`Erro ao desabilitar cliente: ${errorMsg}`);
+                 toast.error("Erro ao desabilitar cliente.");
             } finally {
                 setIsLoading(false);
             }
@@ -144,7 +148,7 @@ export function CustomerFormModal({ isOpen, onOpenChange, isEditing, customer }:
                     {isEditing ? (
                          <Button variant="ghost" className="text-red-500 hover:bg-red-900/20 hover:text-red-400 justify-center sm:justify-start cursor-pointer" onClick={handleDeleteCustomer} disabled={isLoading}>
                             <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir Cliente
+                            Desabilitar Cliente
                         </Button>
                     ) : (
                         <div></div>

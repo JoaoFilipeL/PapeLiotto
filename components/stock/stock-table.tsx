@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,7 @@ export function StockTable() {
     
     const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
     const [modalSearchTerm, setModalSearchTerm] = useState("");
+    const [mainSearchTerm, setMainSearchTerm] = useState("");
 
     const supabase = createClientComponentClient();
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
@@ -127,16 +128,33 @@ export function StockTable() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'stock' }, (payload) => {
                 fetchStock();
             })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stock_history' }, (payload) => {
+                fetchStock();
+            })
             .subscribe();
         return () => { supabase.removeChannel(stockChannel); };
     }, [supabase, fetchStock]);
-
-    const sortedStock = [...stock].sort((a, b) => a.name.localeCompare(b.name));
     
-    const filteredModalStock = stock.filter(item =>
-        item.name.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
-        item.barcode.toLowerCase().includes(modalSearchTerm.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    const filteredModalStock = useMemo(() => {
+        const lowerSearch = modalSearchTerm.toLowerCase();
+        return stock.filter(item =>
+            item.name.toLowerCase().includes(lowerSearch) ||
+            item.barcode.toLowerCase().includes(lowerSearch)
+        ).sort((a, b) => a.name.localeCompare(b.name));
+    }, [stock, modalSearchTerm]);
+
+    const filteredTableStock = useMemo(() => {
+        const lowerSearch = mainSearchTerm.toLowerCase();
+        if (!lowerSearch) {
+            return stock.sort((a, b) => a.name.localeCompare(b.name));
+        }
+        return stock.filter(item =>
+            item.name.toLowerCase().includes(lowerSearch) ||
+            item.supplier.toLowerCase().includes(lowerSearch) ||
+            item.barcode.toLowerCase().includes(lowerSearch)
+        ).sort((a, b) => a.name.localeCompare(b.name));
+    }, [stock, mainSearchTerm]);
+
 
     const openEditProductDialog = (product: StockItem) => {
         if (userProfile?.role !== 'Gerente') {
@@ -156,13 +174,23 @@ export function StockTable() {
         <div className="bg-[#2D2D2D] p-6 rounded-xl border border-zinc-700 font-sans">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-5 mb-5 border-b border-zinc-700">
                 <h1 className="text-white text-3xl font-bold">Estoque</h1>
-                <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                    <div className="relative w-full sm:w-auto">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-500" />
+                        <Input
+                            type="search"
+                            placeholder="Buscar na tabela..."
+                            className="pl-10 w-full sm:w-64 bg-[#1C1C1C] text-white border-zinc-600 placeholder:text-zinc-500 rounded-lg"
+                            value={mainSearchTerm}
+                            onChange={(e) => setMainSearchTerm(e.target.value)}
+                        />
+                    </div>
                     
                     <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
+                            <Button variant="outline" size="icon" className="w-full sm:w-10 bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-2 flex items-center gap-2 cursor-pointer">
                                 <Search className="h-5 w-5" />
-                                Consultar produtos
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="w-full sm:max-w-5xl bg-zinc-900 text-white border-zinc-700">
@@ -227,7 +255,7 @@ export function StockTable() {
             {loading && <div className="text-center text-white py-8"><Loader2 className="h-10 w-10 animate-spin text-white mx-auto" /><p className="mt-3">Carregando...</p></div>}
             {error && <div className="text-center text-red-500 bg-red-900/20 p-3 rounded-md">{error}</div>}
 
-            {!loading && !error && sortedStock.length > 0 && (
+            {!loading && !error && filteredTableStock.length > 0 && (
                 <div className="hidden md:grid md:grid-cols-7 items-center gap-x-4 px-3 pb-2 mb-2 text-xs font-semibold text-zinc-400 uppercase">
                     <div className="col-span-2 text-left">Nome</div>
                     <div className="col-span-1 text-left">Fornecedor</div>
@@ -239,8 +267,8 @@ export function StockTable() {
             )}
             
             <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-2">
-                {!loading && sortedStock.length > 0 && (
-                    sortedStock.map((item) => (
+                {!loading && filteredTableStock.length > 0 && (
+                    filteredTableStock.map((item) => (
                         <div
                             key={item.id}
                             className={`grid grid-cols-1 md:grid-cols-7 items-center gap-x-4 bg-[#1C1C1C] p-3 rounded-lg hover:bg-zinc-800 transition-colors duration-200 text-sm ${userProfile?.role === 'Gerente' ? 'cursor-pointer' : 'cursor-default'}`}
@@ -272,7 +300,7 @@ export function StockTable() {
                         </div>
                     ))
                 )}
-                {!loading && sortedStock.length === 0 && !error && (
+                {!loading && filteredTableStock.length === 0 && !error && (
                     <div className="text-center text-zinc-500 py-10">Nenhum produto encontrado.</div>
                 )}
             </div>

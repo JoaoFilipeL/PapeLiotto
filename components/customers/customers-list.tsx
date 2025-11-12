@@ -28,6 +28,7 @@ export function CustomersList() {
             const { data, error } = await supabase
                 .from('customers')
                 .select('*')
+                .eq('is_archived', false)
                 .order('name', { ascending: true });
             if (error) throw error;
             setCustomers(data);

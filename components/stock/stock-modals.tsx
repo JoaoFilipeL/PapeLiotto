@@ -218,15 +218,6 @@ export function EditStockProductDialog({ isOpen, onOpenChange, product, logStock
 
             if (error) throw error;
             
-            await logStockChange({
-                product_id: product.id,
-                product_name: product.name,
-                action: 'Produto Desabilitado',
-                quantity_change: 0, 
-                old_quantity: product.quantity,
-                new_quantity: product.quantity
-            });
-            
             toast.success("Produto desabilitado com sucesso.");
             onOpenChange(false);
         } catch (err: any) { 

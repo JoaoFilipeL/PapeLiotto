@@ -12,8 +12,8 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils";
-import { Order, Customer, Budget, CurrentUser } from "./types/orders"
-import { Product as StockProduct } from "../stock/types/stock"
+import { Order, Customer, Budget, CurrentUser } from "./types/orders" 
+import { Product as StockProduct } from "../stock/types/stock" 
 import { handlePrint, handleSaveAsPdf } from "./order-print-utils"
 import { AddOrderDialog, EditOrderDialog, OrderDetailsDialog } from "./order-modals"
 import { toast } from "sonner"
@@ -51,16 +51,17 @@ export function OrdersList() {
         setLoading(true);
         setError(null);
         try {
-            const { data: customersData, error: customersError } = await supabase.from('customers').select('*').order('name');
+            const { data: customersData, error: customersError } = await supabase.from('customers').select('*').eq('is_archived', false).order('name');
             if (customersError) throw customersError;
             setCustomers(customersData);
 
-            const { data: productsData, error: productsError } = await supabase.from('stock').select('*').order('name');
+            const { data: productsData, error: productsError } = await supabase.from('stock').select('*').eq('is_archived', false).order('name');
             if (productsError) throw productsError;
             setProducts(productsData.map(p => ({ ...p, price: parseFloat(p.price as any) })));
 
-            const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').order('created_at', { ascending: sortOrder === 'asc' });
+            const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').eq('is_archived', false).order('created_at', { ascending: sortOrder === 'asc' });
             if (ordersError) throw ordersError;
+            
             const orderIds = ordersData.map(o => o.id);
             if(orderIds.length > 0) {
                 const { data: itemsData, error: itemsError } = await supabase.from('order_items').select('*').in('order_id', orderIds);
@@ -74,10 +75,11 @@ export function OrdersList() {
                 setOrders([]);
             }
 
-            const lastId = ordersData.length > 0 ? Math.max(...ordersData.map(o => parseInt(o.order_code.split('-')[1]))) : 0;
+            const { data: lastOrderData, error: lastOrderError } = await supabase.from('orders').select('order_code').order('created_at', { ascending: false }).limit(1).single();
+            const lastId = lastOrderData ? parseInt(lastOrderData.order_code.split('-')[1]) : 0;
             setNextOrderCode(`PED-${(lastId + 1).toString().padStart(4, '0')}`);
 
-            const { data: budgetsData, error: budgetsError } = await supabase.from('budgets').select('*').order('created_at', { ascending: false });
+            const { data: budgetsData, error: budgetsError } = await supabase.from('budgets').select('*').is('deleted_at', null).order('created_at', { ascending: false });
             if (budgetsError) throw budgetsError;
 
             const budgetIds = budgetsData.map(b => b.id);
@@ -108,10 +110,7 @@ export function OrdersList() {
     useEffect(() => {
         fetchData();
         const channel = supabase.channel('orders_realtime')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchData)
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'stock' }, fetchData) 
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, fetchData)
-            .subscribe();
+            .on('postgres_changes', { event: '*', schema: 'public' }, fetchData).subscribe();
             
         return () => { supabase.removeChannel(channel); };
     }, [supabase, fetchData]);
@@ -248,7 +247,7 @@ export function OrdersList() {
                 </div>
             )}
 
-            <div className="space-y-2 max-h-[58vh] overflow-y-auto pr-2">
+            <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-2">
                 {!loading && filteredOrders.map(order => (
                     <div 
                         key={order.id} 

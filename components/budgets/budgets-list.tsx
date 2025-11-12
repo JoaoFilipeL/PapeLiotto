@@ -24,7 +24,7 @@ export function BudgetsList() {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
     const [isEditing, setIsEditing] = useState(false);
-
+    
     const supabase = createClientComponentClient();
 
     useEffect(() => {
@@ -34,7 +34,7 @@ export function BudgetsList() {
         };
         fetchUser();
     }, [supabase]);
-
+    
     const fetchData = useCallback(async () => {
         setError(null);
         try {
@@ -62,7 +62,7 @@ export function BudgetsList() {
                 const combinedBudgets: Budget[] = budgetsData.map(budget => ({
                     ...budget,
                     total_amount: parseFloat(budget.total_amount as any),
-                    items: itemsData.filter(item => item.budget_id === budget.id).map(item => ({ ...item, unit_price: parseFloat(item.unit_price as any) }))
+                    items: itemsData.filter(item => item.budget_id === budget.id).map(item => ({...item, unit_price: parseFloat(item.unit_price as any)}))
                 }));
                 setBudgets(combinedBudgets);
             } else {
@@ -75,25 +75,30 @@ export function BudgetsList() {
             setLoading(false);
         }
     }, [supabase]);
-
+    
     useEffect(() => {
         setLoading(true);
         fetchData();
     }, [fetchData]);
 
     useEffect(() => {
-        const channel = supabase.channel('budgets_realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, (payload) => {
-            fetchData();
-        }).subscribe();
+        const channel = supabase.channel('budgets_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'budgets' }, (payload) => {
+                fetchData();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'budget_items' }, (payload) => {
+                fetchData();
+            })
+            .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, [supabase, fetchData]);
-
+    
     const openAddDialog = () => {
         setIsEditing(false);
         setSelectedBudget(null);
         setIsFormOpen(true);
     };
-
+    
     const openEditDialog = (budget: Budget) => {
         setIsEditing(true);
         setSelectedBudget(budget);
@@ -105,11 +110,11 @@ export function BudgetsList() {
         setIsDetailsOpen(true);
     };
 
-    const filteredBudgets = budgets.filter(q =>
-        (q.budget_code && q.budget_code.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    const filteredBudgets = budgets.filter(q => 
+        (q.budget_code && q.budget_code.toLowerCase().includes(searchTerm.toLowerCase())) || 
         (q.customer_name && q.customer_name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
-
+    
     const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('pt-BR');
 
     return (
@@ -127,7 +132,7 @@ export function BudgetsList() {
                     </Button>
                 </div>
             </div>
-
+            
             <div className="hidden md:grid md:grid-cols-12 items-center gap-x-4 px-3 pb-2 text-xs font-semibold text-zinc-400 uppercase">
                 <div className="col-span-2 text-left">Código</div>
                 <div className="col-span-3 text-left">Cliente</div>
@@ -140,11 +145,11 @@ export function BudgetsList() {
 
             {loading && <div className="text-center text-white py-8"><Loader2 className="h-10 w-10 animate-spin text-white mx-auto" /><p className="mt-3">Carregando...</p></div>}
             {error && <div className="text-center text-red-500 bg-red-900/20 p-3 rounded-md">{error}</div>}
-
+                
             <div className="space-y-2 max-h-[58vh] overflow-y-auto pr-2">
                 {!loading && filteredBudgets.map(budget => (
-                    <div
-                        key={budget.id}
+                    <div 
+                        key={budget.id} 
                         className="grid grid-cols-2 md:grid-cols-12 items-center gap-x-4 bg-[#1C1C1C] p-3 rounded-lg hover:bg-zinc-800 transition-colors duration-200 cursor-pointer"
                         onClick={() => openEditDialog(budget)}
                     >
@@ -159,8 +164,8 @@ export function BudgetsList() {
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="cursor-pointer hover:bg-zinc-700"><MoreVertical className="h-5 w-5 text-zinc-400" /></Button></DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="bg-zinc-800 text-white border-zinc-700">
-                                    <DropdownMenuItem className="cursor-pointer focus:bg-zinc-700 focus:text-white" onSelect={() => handleSaveAsPdf(budget)}><FileDown className="mr-2 h-4 w-4" />Salvar em PDF</DropdownMenuItem>
-                                    <DropdownMenuItem className="cursor-pointer focus:bg-zinc-700 focus:text-white" onSelect={() => handlePrint(budget)}><Printer className="mr-2 h-4 w-4" />Imprimir</DropdownMenuItem>
+                                    <DropdownMenuItem className="cursor-pointer focus:bg-zinc-700 focus:text-white" onSelect={() => handleSaveAsPdf(budget)}><FileDown className="mr-2 h-4 w-4"/>Salvar em PDF</DropdownMenuItem>
+                                    <DropdownMenuItem className="cursor-pointer focus:bg-zinc-700 focus:text-white" onSelect={() => handlePrint(budget)}><Printer className="mr-2 h-4 w-4"/>Imprimir</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -170,7 +175,7 @@ export function BudgetsList() {
                     <div className="text-center text-zinc-500 py-10">Nenhum orçamento encontrado.</div>
                 )}
             </div>
-
+            
             <BudgetFormDialog
                 isOpen={isFormOpen}
                 onOpenChange={setIsFormOpen}
@@ -181,7 +186,7 @@ export function BudgetsList() {
                 onBudgetSaved={fetchData}
             />
 
-            <BudgetDetailsDialog
+             <BudgetDetailsDialog
                 isOpen={isDetailsOpen}
                 onOpenChange={setIsDetailsOpen}
                 budget={selectedBudget}

@@ -101,27 +101,30 @@ export function BudgetFormDialog({ isOpen, onOpenChange, customers, products, cu
     const handleSubmitBudget = async () => {
         if (budgetItems.length === 0) { setFormError("Adicione pelo menos um produto ao orçamento."); return; }
         setIsLoading(true); setFormError(null);
-
+        
         try {
             const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
             const total_amount = calculateTotal(budgetItems);
-
-            let budgetData, error;
-
+            
             if (isEditing && editingBudget) {
-                const updateData = {
-                    total_amount,
-                    customer_id: selectedCustomer?.id || null,
-                    customer_name: selectedCustomer?.name || null,
-                    valid_until: validUntil,
-                };
-                const { data, error: updateError } = await supabase.from('budgets').update(updateData).eq('id', editingBudget.id).select().single();
-                budgetData = data;
-                error = updateError;
+                const items_to_insert = budgetItems.map(item => ({
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price
+                }));
 
-                if (!error) {
-                    await supabase.from('budget_items').delete().eq('budget_id', editingBudget.id);
-                }
+                const { error } = await supabase.rpc('update_budget_and_items', {
+                    budget_id_input: editingBudget.id,
+                    new_customer_id: selectedCustomer?.id || null,
+                    new_customer_name: selectedCustomer?.name || null,
+                    new_valid_until: validUntil,
+                    new_total_amount: total_amount,
+                    new_items: items_to_insert
+                });
+                
+                if (error) throw error;
+                
             } else {
                 const insertData = {
                     total_amount,
@@ -130,21 +133,20 @@ export function BudgetFormDialog({ isOpen, onOpenChange, customers, products, cu
                     valid_until: validUntil,
                     employee_name: currentUser?.email
                 };
-                const { data, error: insertError } = await supabase.from('budgets').insert(insertData).select().single();
-                budgetData = data;
-                error = insertError;
+                const { data: budgetData, error: insertError } = await supabase.from('budgets').insert(insertData).select().single();
+                
+                if (insertError) throw insertError;
+                
+                const itemsToInsert = budgetItems.map(item => ({ budget_id: budgetData.id, ...item }));
+                const { error: itemsError } = await supabase.from('budget_items').insert(itemsToInsert);
+                if (itemsError) throw itemsError;
             }
-
-            if (error) throw error;
-
-            const itemsToInsert = budgetItems.map(item => ({ budget_id: budgetData.id, ...item }));
-            const { error: itemsError } = await supabase.from('budget_items').insert(itemsToInsert);
-            if (itemsError) throw itemsError;
-
+            
             toast.success(`Orçamento ${isEditing ? 'atualizado' : 'criado'} com sucesso!`);
             onOpenChange(false);
             onBudgetSaved();
         } catch (err: any) {
+            console.error("Erro ao salvar orçamento:", err);
             setFormError("Erro ao salvar o orçamento. Tente novamente.");
             toast.error("Erro ao salvar o orçamento.");
         } finally {
@@ -187,7 +189,7 @@ export function BudgetFormDialog({ isOpen, onOpenChange, customers, products, cu
                         </div>
                         <div>
                             <Label className="block text-sm font-medium text-zinc-400 mb-1">Válido até</Label>
-                            <Input type="date" value={validUntil} min={todayDate()} onChange={(e) => setValidUntil(e.target.value)} className="w-full h-10 bg-zinc-800 border-zinc-700" />
+                            <Input type="date" value={validUntil} min={todayDate()} onChange={(e) => setValidUntil(e.target.value)} className="w-full h-10 bg-zinc-800 border-zinc-700"/>
                         </div>
                     </div>
                     <Separator className="bg-zinc-700" />
@@ -233,7 +235,7 @@ export function BudgetFormDialog({ isOpen, onOpenChange, customers, products, cu
                                     <p>{item.quantity}x {item.product_name}</p>
                                     <p className="text-xs text-zinc-400">{(item.unit_price * item.quantity).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                 </div>
-                                <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-900/20 cursor-pointer" onClick={() => handleRemoveItemFromList(budgetItems, setBudgetItems, item.product_id)}><Trash2 className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-900/20 cursor-pointer" onClick={() => handleRemoveItemFromList(budgetItems, setBudgetItems, item.product_id)}><Trash2 className="h-4 w-4"/></Button>
                             </div>
                         ))}
                     </div>
@@ -271,7 +273,7 @@ interface BudgetDetailsDialogProps {
 
 export function BudgetDetailsDialog({ isOpen, onOpenChange, budget }: BudgetDetailsDialogProps) {
     const formatDateWithTimezone = (dateString: string) => new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR');
-
+    
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl bg-zinc-900 text-white border-zinc-700">
