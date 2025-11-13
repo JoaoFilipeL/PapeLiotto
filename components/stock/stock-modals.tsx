@@ -31,9 +31,10 @@ const initialNewItemState = {
 interface AddStockProductDialogProps {
     logStockChange: (details: any) => Promise<void>;
     currentUser: CurrentUser | null;
+    onProductAdded: () => void;
 }
 
-export function AddStockProductDialog({ logStockChange, currentUser }: AddStockProductDialogProps) {
+export function AddStockProductDialog({ logStockChange, currentUser, onProductAdded }: AddStockProductDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newItem, setNewItem] = useState(initialNewItemState);
@@ -75,6 +76,7 @@ export function AddStockProductDialog({ logStockChange, currentUser }: AddStockP
             setNewItem(initialNewItemState);
             setIsOpen(false);
             toast.success("Produto adicionado com sucesso!");
+            onProductAdded();
         } catch (err: any) {
             console.error("Erro inesperado ao adicionar item:", err);
             setFormError(err.message);
@@ -117,9 +119,10 @@ interface EditStockProductDialogProps {
     product: StockItem | null;
     logStockChange: (details: any) => Promise<void>;
     userProfile: UserProfile | null;
+    onProductUpdated: () => void;
 }
 
-export function EditStockProductDialog({ isOpen, onOpenChange, product, logStockChange, userProfile }: EditStockProductDialogProps) {
+export function EditStockProductDialog({ isOpen, onOpenChange, product, logStockChange, userProfile, onProductUpdated }: EditStockProductDialogProps) {
     const [formError, setFormError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -196,6 +199,7 @@ export function EditStockProductDialog({ isOpen, onOpenChange, product, logStock
             
             toast.success("Produto atualizado com sucesso!");
             onOpenChange(false);
+            onProductUpdated();
         } catch (err: any) { 
             setFormError(err.message); 
             toast.error("Erro ao atualizar produto.");
@@ -220,6 +224,7 @@ export function EditStockProductDialog({ isOpen, onOpenChange, product, logStock
             
             toast.success("Produto desabilitado com sucesso.");
             onOpenChange(false);
+            onProductUpdated();
         } catch (err: any) { 
             setFormError(err.message); 
             toast.error("Erro ao desabilitar produto.");
@@ -267,9 +272,10 @@ interface StockQuantityDialogProps {
     onOpenChange: (open: boolean) => void;
     productInfo: { product: StockItem; type: 'add' | 'subtract' } | null;
     logStockChange: (details: any) => Promise<void>;
+    onQuantityUpdated: () => void;
 }
 
-export function StockQuantityDialog({ isOpen, onOpenChange, productInfo, logStockChange }: StockQuantityDialogProps) {
+export function StockQuantityDialog({ isOpen, onOpenChange, productInfo, logStockChange, onQuantityUpdated }: StockQuantityDialogProps) {
     const [amount, setAmount] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -320,6 +326,7 @@ export function StockQuantityDialog({ isOpen, onOpenChange, productInfo, logStoc
 
             toast.success("Quantidade atualizada!");
             onOpenChange(false);
+            onQuantityUpdated();
         } catch (err: any) {
             setError(err.message);
             toast.error("Erro ao atualizar quantidade.");

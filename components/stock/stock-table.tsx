@@ -247,6 +247,7 @@ export function StockTable() {
                         <AddStockProductDialog 
                             logStockChange={logStockChange}
                             currentUser={currentUser}
+                            onProductAdded={fetchStock}
                         />
                     )}
                 </div>
@@ -305,14 +306,16 @@ export function StockTable() {
                 )}
             </div>
             
-            <div className="flex justify-end mt-6">
-                <Link href="/stock/history" passHref>
-                    <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
-                        <History className="h-5 w-5" />
-                        Histórico
-                    </Button>
-                </Link>
-            </div>
+            {userProfile?.role === 'Gerente' && (
+                <div className="flex justify-end mt-6">
+                    <Link href="/stock/history" passHref>
+                        <Button variant="outline" className="w-full sm:w-auto bg-transparent text-white hover:bg-zinc-700 hover:text-white rounded-lg font-semibold py-2 px-4 flex items-center gap-2 cursor-pointer">
+                            <History className="h-5 w-5" />
+                            Histórico
+                        </Button>
+                    </Link>
+                </div>
+            )}
 
             <EditStockProductDialog
                 isOpen={isEditProductDialogOpen}
@@ -320,6 +323,7 @@ export function StockTable() {
                 product={editingProduct}
                 logStockChange={logStockChange}
                 userProfile={userProfile}
+                onProductUpdated={fetchStock}
             />
 
             <StockQuantityDialog
@@ -327,6 +331,7 @@ export function StockTable() {
                 onOpenChange={setIsQuantityDialogOpen}
                 productInfo={quantityChangeInfo}
                 logStockChange={logStockChange}
+                onQuantityUpdated={fetchStock}
             />
         </div>
     )
